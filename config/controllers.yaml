@@ -1,0 +1,11 @@
+controller_list:
+ - name: komodo_arm_controller
+   action_ns: follow_joint_trajectory
+   type: FollowJointTrajectory
+   default: true
+   joints:
+      - base_rotation_joint
+      - shoulder_joint
+      - elbow1_joint
+      - elbow2_joint
+      - wrist_joint
