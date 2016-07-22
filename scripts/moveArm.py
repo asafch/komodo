@@ -67,6 +67,12 @@ class MoveArm:
             self.init_arm()
 
     def move_arm(self, elevator, base, shoulder, elbow1, elbow2, wrist):
+        self.lock.acquire()
+        self.is_accomplished_base        = False
+        self.is_accomplished_shoulder    = False
+        self.is_accomplished_elbow1      = False
+        self.is_accomplished_elbow2      = False
+        self.is_accomplished_wrist       = False
         self.target_elevator = elevator
         self.target_base = base
         self.target_shoulder = shoulder
@@ -79,6 +85,7 @@ class MoveArm:
         self.elbow1_command.publish(elbow1)
         self.elbow2_command.publish(elbow2)
         self.wrist_command.publish(wrist)
+        self.lock.release()
 
     def init_arm(self):
         self.move_arm(0.0, 0.0, 1.5, 2.0, -2.0, 0.0)
