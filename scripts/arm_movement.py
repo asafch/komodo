@@ -57,13 +57,14 @@ class ArmMovement:
     def process_command(self, command):
         self.move_command = command.data
         self.response_sent = False
-        rospy.loginfo("Arm movement: command: %s", command.data)
+        rospy.loginfo("Arm movement: command received: %s", command.data)
         self.initialize_subscribers()
         if self.move_command == "INIT_ARM":
             self.init_arm()
 
     def move_arm(self, elevator, base, shoulder, elbow1, elbow2, wrist):
         self.lock.acquire()
+        is_accomplished_elevator         = False
         self.is_accomplished_base        = False
         self.is_accomplished_shoulder    = False
         self.is_accomplished_elbow1      = False

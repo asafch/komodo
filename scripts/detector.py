@@ -15,11 +15,17 @@ class Detector:
     camera_subscription = None
     bridge = None
     processed_image_publisher = None
+    offset = 5
+    wheel_publisher = None
+    state = ""
 
     def __init__(self):
-        rospy.Subscriber("/pluto/current_camera", String, self.camera_change)
+        self.state = "NO_SEARCH"
+        rospy.Subscriber("/pluto/detector/current_camera", String, self.camera_change)
+        rospy.Subscriber("/pluto/detector/state_change", String, self.state_change)
         self.bridge = cv_bridge.CvBridge()
         self.processed_image_publisher = rospy.Publisher("/pluto/processed_image", Image, queue_size = 10)
+        self.wheel_publisher = rospy.Publisher("pluto/robot_movement/command", String, queue_size = 10)
 
     def camera_change(self, command):
         self.current_camera = command.data
@@ -31,7 +37,17 @@ class Detector:
         elif self.current_camera == "CREATIVE_CAMERA":
             self.camera_subscription = rospy.Subscriber("/Creative_Camera/rgb/image_raw", Image, self.process_image)
 
+    def state_change(self, command):
+        if command.data == "SEARCH":
+            self.state = "SEARCH"
+            rospy.loginfo("Detector: starting to search for ball")
+        elif command.data == "NO_SEARCH":
+            self.state = "NO_SEARCH"
+            rospy.loginfo("Detector: stopped searching for ball")
+
     def process_image(self, image):
+        if self.state == "NO_SEARCH":
+            return
         image_cv = self.bridge.imgmsg_to_cv2(image, "bgr8")
         # im = cv2.cvtColor(image_cv, cv2.COLOR_BGR2HSV)
         # hsv = cv2.cvtColor(image_cv, cv2.COLOR_BGR2HSV)
@@ -81,6 +97,7 @@ class Detector:
             r = keypoint.size / 2.0
             circles.append([x, y, r])
         target = [0, 0, 0]
+        max_circle = None
         if circles:
             circles     = np.uint16(np.around(circles))
             max_r       = 0
@@ -95,7 +112,10 @@ class Detector:
         cv2.circle(processed_image, center, target[2], (255, 0, 0), 1, 8, 0)
         # publish the keypoints and target circle superimposed on the source image from the camera
         self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image, "bgr8"))
-        return circles != [], target
+        if max_circle != None and abs(target[0] - (image.width / 2)) < self.offset:
+            self.wheel_publisher.publish("STOP-BALL_FOUND")
+            rospy.loginfo("Detector: ball found")
+            self.state = "NO_SEARCH"
 
 if __name__ == "__main__":
     rospy.init_node("detector")

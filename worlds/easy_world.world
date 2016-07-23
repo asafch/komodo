@@ -80,7 +80,7 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <model name='ball_02'>
-      <pose>2 -1 0 0 0 0</pose>
+      <pose>2 -1 2 0 0 0</pose>
       <link name='link'>
         <inertial>
           <mass>0.057</mass>
@@ -138,9 +138,9 @@
       <real_time>38 892308814</real_time>
       <wall_time>1449944051 10683807</wall_time>
       <model name='ball_02'>
-        <pose>2 0 0 0 0 0</pose>
+        <pose>2 -1 2 0 0 0</pose>
         <link name='link'>
-          <pose>2 0 0 0 0 0</pose>
+          <pose>2 -1 2 0 0 0</pose>
           <velocity>0 0 0 0 0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 0 0</wrench>
