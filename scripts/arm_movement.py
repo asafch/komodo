@@ -14,7 +14,7 @@ from dynamixel_msgs.msg import JointState as dxl_JointState
 from pluto.msg import DetectResult
 from pluto.srv import Grip
 
-class MoveArm:
+class ArmMovement:
     move_command = ""
     response_sent = False
     target_elevator             = 0.0
@@ -31,38 +31,34 @@ class MoveArm:
     is_accomplished_wrist       = False
     error_value                 = 0.02
     lock = None
+    elevator_subscriber = None
+    base_subscriber = None
+    shoulder_subscriber = None
+    elbow1_subscriber = None
+    elbow2_subscriber = None
+    wrist_subscriber = None
 
     def __init__(self):
         rospy.loginfo("Arm movement: initializing")
         init_arguments(self) 
         self.lock = Lock()
-        if self.is_simulation == True:
-            JointType = JointControllerState
-        else:
-            JointType = dxl_JointState
         #arm publisher and suscriber
         rospy.Subscriber("/pluto/arm_movement/command", String, self.process_command)
-        self.movement_result_publisher = rospy.Publisher("/pluto/arm_movement/result", String, queue_size=10)
+        self.movement_result_publisher = rospy.Publisher("/pluto/arm_movement/result", String, queue_size = 10)
         #joint command publishers
-        self.elevator_command       = rospy.Publisher('/elevator_controller/command', Float64, queue_size=10)
-        self.base_command       = rospy.Publisher('/base_rotation_controller/command', Float64, queue_size=10)
+        self.elevator_command       = rospy.Publisher('/elevator_controller/command', Float64, queue_size = 10)
+        self.base_command       = rospy.Publisher('/base_rotation_controller/command', Float64, queue_size = 10)
         self.shoulder_command   = rospy.Publisher( pluto_add_namespace( self.is_simulation, '/shoulder_controller/command'      ), Float64, queue_size=10)
         self.elbow1_command     = rospy.Publisher( pluto_add_namespace( self.is_simulation, '/elbow1_controller/command'        ), Float64, queue_size=10)
         self.elbow2_command     = rospy.Publisher( pluto_add_namespace( self.is_simulation, '/elbow2_controller/command'        ), Float64, queue_size=10)
         self.wrist_command      = rospy.Publisher( pluto_add_namespace( self.is_simulation, '/wrist_controller/command'         ), Float64, queue_size=10)
-        #joint state suscribers
-        rospy.Subscriber('/elevator_controller/state', JointType, self.elevator_controller        )
-        rospy.Subscriber('/base_rotation_controller/state', JointType, self.base_controller        )
-        rospy.Subscriber( pluto_add_namespace( self.is_simulation, '/shoulder_controller/state'         ), JointType, self.shoulder_controller  )
-        rospy.Subscriber( pluto_add_namespace( self.is_simulation, '/elbow1_controller/state'           ), JointType, self.elbow1_controller    )
-        rospy.Subscriber( pluto_add_namespace( self.is_simulation, '/elbow2_controller/state'           ), JointType, self.elbow2_controller    )
-        rospy.Subscriber( pluto_add_namespace( self.is_simulation, '/wrist_controller/state'            ), JointType, self.wrist_controller     )
         rospy.loginfo("Arm movement: initialized")
 
     def process_command(self, command):
         self.move_command = command.data
         self.response_sent = False
         rospy.loginfo("Arm movement: command: %s", command.data)
+        self.initialize_subscribers()
         if self.move_command == "INIT_ARM":
             self.init_arm()
 
@@ -92,7 +88,7 @@ class MoveArm:
 
     def elevator_controller(self, result):
         self.lock.acquire()
-        self.is_accomplished_elevator = abs(self.target_elevator - result.process_value) <= (self.error_value + 0.02)
+        self.is_accomplished_elevator = abs(self.target_elevator - result.process_value) <= self.error_value
         self.lock.release()
         self.check_command_executed()
         # if not self.is_accomplished_elevator:
@@ -144,6 +140,27 @@ class MoveArm:
         #     rospy.loginfo("wrist")
         #     rospy.loginfo(abs(self.target_wrist - result.process_value))
 
+    def initialize_subscribers(self):
+        if self.is_simulation:
+            JointType = JointControllerState
+        else:
+            JointType = dxl_JointState
+        #joint state suscribers
+        self.elevator_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/elevator_controller/state'), JointType, self.elevator_controller)
+        self.base_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/base_rotation_controller/state'), JointType, self.base_controller)
+        self.shoulder_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/shoulder_controller/state'), JointType, self.shoulder_controller)
+        self.elbow1_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/elbow1_controller/state'), JointType, self.elbow1_controller)
+        self.elbow2_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/elbow2_controller/state'), JointType, self.elbow2_controller)
+        self.wrist_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, '/wrist_controller/state'), JointType, self.wrist_controller)
+    
+    def shutdown_subscribers(self):
+        self.elevator_subscriber.unregister()
+        self.base_subscriber.unregister()
+        self.shoulder_subscriber.unregister()
+        self.elbow1_subscriber.unregister()
+        self.elbow2_subscriber.unregister()
+        self.wrist_subscriber.unregister()
+
     def check_command_executed(self):
         if not self.response_sent:
             check = (self.is_accomplished_elevator and \
@@ -153,6 +170,7 @@ class MoveArm:
                 self.is_accomplished_elbow2 and \
                 self.is_accomplished_wrist)
             if check:
+                self.shutdown_subscribers()
                 self.movement_result_publisher.publish("ARM_INIT_DONE")
                 rospy.loginfo("Arm movement: initialization complete")
                 self.response_sent = True
@@ -161,7 +179,7 @@ class MoveArm:
 if __name__ == '__main__':
   try:
     rospy.init_node("arm_movement")
-    move_arm = MoveArm()
+    arm_movement = ArmMovement()
     rospy.spin()
   except rospy.ROSInterruptException:
     pass

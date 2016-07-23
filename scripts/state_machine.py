@@ -16,9 +16,10 @@ class StateMachine:
     def __init__(self):
         rospy.loginfo("State machine: initializing")
         self.state = "INIT_ARM"
-        self.arm_movement_publisher = rospy.Publisher("/pluto/arm_movement/command", String, queue_size=10)
+        self.arm_movement_publisher = rospy.Publisher("/pluto/arm_movement/command", String, queue_size = 10)
         rospy.Subscriber("/pluto/arm_movement/result", String, self.arm_movement_done)
-        time.sleep(15) # allow moveArm.py to load before sending the first arm initialization command
+        self.camera_publisher = rospy.Publisher("/pluto/current_camera", String, queue_size = 10)
+        time.sleep(10) # allow moveArm.py to load before sending the first arm initialization command
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")
 
@@ -30,10 +31,11 @@ class StateMachine:
     def main_loop(self):
         rospy.loginfo("State machine: main loop started")
         while True:
-            if self.state == "INIT_ARM" and self.arm_init_message_sent == False:
+            if self.state == "INIT_ARM" and not self.arm_init_message_sent:
                 self.arm_movement_publisher.publish("INIT_ARM")
                 rospy.loginfo("State machine: arm initialization message sent")
                 self.arm_init_message_sent = True
+                self.camera_publisher.publish("ASUS_CAMERA")
 
 
 
