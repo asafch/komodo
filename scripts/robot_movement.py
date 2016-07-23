@@ -40,64 +40,72 @@ class RobotMovement:
 			if abs(self.last_orientation - self.odometry_get_angle(message)) >= self.angular_offset * 2:
 				self.prepared_to_stop = True
 			elif self.prepared_to_stop and abs(self.last_orientation - self.odometry_get_angle(message)) <= self.angular_offset:
-				self.stop_turning("NO_BALL")
+				self.stop_in_place("NO_BALL")
 
 	def odometry_get_angle(self, message):
 		q = message.pose.pose.orientation
 		roll, pitch, yaw = euler_from_quaternion([q.w, q.x, q.y, q.z])
 		return (roll * 180 / math.pi) + 180
 
-	def stop_turning(self, cause):
+	# def stop_turning(self, cause):
+	# 	self.searching_for_ball = False
+	# 	self.movement_message = Twist()
+	# 	self.movement_publisher.publish(self.movement_message)
+	# 	self.state_machine_publisher.publish(cause)
+	# 	if cause == "BALL_FOUND":
+	# 		rospy.loginfo("Robot movement: ball is centered, wheels stopped")
+	# 	else:
+	# 		rospy.loginfo("Robot movement: no ball detected")
+
+	def stop_in_place(self, cause):
 		self.searching_for_ball = False
 		self.movement_message = Twist()
 		self.movement_publisher.publish(self.movement_message)
 		self.state_machine_publisher.publish(cause)
-		if cause == "BALL_FOUND":
-			rospy.loginfo("Robot movement: ball is centered, wheels stopped")
-		else:
-			rospy.loginfo("Robot movement: no ball detected")
+		rospy.loginfo("Robot movement: %s", cause)
+		self.fine_movement = True
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			if self.is_simulation:
-				return 0.2
-			else:
-				return 0.75
+			return 0.1
 		else:
-			if self.is_simulation:
-				return 0.5
-			else:
-				return 0.85
+			return 0.5
+
+	def get_linear_speed(self):
+		if self.fine_movement:
+			return 0.1
+		else:
+			return 0.2
+
+	def move_robot(self, direction, lx, ly, lz, ax, ay, az):
+		self.movement_message.linear.x = lx
+		self.movement_message.linear.y = ly
+		self.movement_message.linear.z = lz
+		self.movement_message.angular.x = ax
+		self.movement_message.angular.y = ay
+		self.movement_message.angular.z = az
+		rospy.loginfo("Robot movement: move %s", direction)
+		self.movement_publisher.publish(self.movement_message)
 
 	def process_command(self, command):
 		if command.data == "SEARCH_BALL":
-			self.movement_message.linear.x = 0
-			self.movement_message.linear.y = 0
-			self.movement_message.linear.z = 0
-			self.movement_message.angular.x = 0
-			self.movement_message.angular.y = 0
-			self.movement_message.angular.z = -self.get_anguler_speed()
-			rospy.loginfo("Robot movement: move RIGHT")
+			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 			self.update_reference_odometry = True
 			self.searching_for_ball = True
-			self.movement_publisher.publish(self.movement_message)
 		elif command.data == "STOP-BALL_FOUND":
-			self.stop_turning("BALL_FOUND")
+			self.stop_in_place("BALL_FOUND")
+		elif command.data == "STOP-BALL_AT_BOTTOM_OF_FRAME":
+			self.stop_in_place("BALL_AT_BOTTOM_OF_FRAME")
+		elif command.data == "STOP-BALL_AT_POSITION":
+			self.stop_in_place("BALL_AT_POSITION")
 		elif command.data == "LEFT":
-			return
+			self.move_robot(command.data, 0, 0, 0, 0, 0, self.get_anguler_speed())
 		elif command.data == "RIGHT":
-			self.movement_message.linear.x = 0
-			self.movement_message.linear.y = 0
-			self.movement_message.linear.z = 0
-			self.movement_message.angular.x = 0
-			self.movement_message.angular.y = 0
-			self.movement_message.angular.z = -self.get_anguler_speed()
-			rospy.loginfo("Robot movement: move RIGHT")
-			self.movement_publisher.publish(self.movement_message)
+			self.move_robot(command.data, 0, 0, 0, 0, 0, -self.get_anguler_speed())
 		elif command.data == "FORWARD":
-			return
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
 		else: # BACKWARD
-			return
+			self.move_robot(command.data, -self.get_linear_speed(), 0, 0, 0, 0, 0)
 
 if __name__ == "__main__":
 	rospy.init_node("robot_movement")
