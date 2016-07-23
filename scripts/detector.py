@@ -49,9 +49,13 @@ class Detector:
         # #(thresh, im) = cv2.threshold(im, 20, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
         # thresh, bw_im = cv2.threshold(im1, 1, 255, cv2.THRESH_BINARY)
         blurred_image = cv2.GaussianBlur(image_cv, (5, 5), 0)
-        bw_im = cv2.cvtColor(blurred_image, cv2.COLOR_BGR2GRAY)
+        # cv2.imshow("blurred_image", blurred_image)
+        # cv2.waitKey(0)
+        bw_image = cv2.cvtColor(blurred_image, cv2.COLOR_BGR2GRAY)
+        # cv2.imshow("bw_image", bw_image)
+        # cv2.waitKey(0)
         params = cv2.SimpleBlobDetector_Params()
-        im = bw_im
+        im = bw_image
         params.filterByInertia = False
         params.filterByConvexity = True
         params.filterByColor = False
@@ -61,23 +65,22 @@ class Detector:
         params.maxArea = 1000.0
         params.minConvexity = 0.87
         params.maxConvexity = 1.0
-        params.minCircularity = 0.1
-
+        params.minCircularity = 0.5
         # Create a detector with the parameters, according to your OpenCV version (2 or 3)
         ver = (cv2.__version__).split('.')
         if int(ver[0]) < 3 :
             detector = cv2.SimpleBlobDetector(params)
         else : 
             detector = cv2.SimpleBlobDetector_create(params)
-        # Detect blobs.
-        keypoints = detector.detect(im)
+        # Detect blobs
+        keypoints = detector.detect(bw_image)
         circles = []
-        if keypoints:
-            x = keypoints[0].pt[0]
-            y = keypoints[0].pt[1]
-            r = (keypoints[0].size)/2
+        for keypoint in keypoints:
+            x = keypoint.pt[0]
+            y = keypoint.pt[1]
+            r = keypoint.size / 2.0
             circles.append([x, y, r])
-        center_coordinates_and_radius   = (0, 0, 0) 
+        target = [0, 0, 0]
         if circles:
             circles     = np.uint16(np.around(circles))
             max_r       = 0
@@ -86,10 +89,13 @@ class Detector:
                 if circle[2] > max_r:
                     max_r       = circle[2]
                     max_circle  = circle
-            center_coordinates_and_radius = max_circle
+            target = max_circle
         processed_image = cv2.drawKeypoints(image_cv, keypoints, np.array([]), (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        center = (target[0], target[1])
+        cv2.circle(processed_image, center, target[2], (255, 0, 0), 1, 8, 0)
+        # publish the keypoints and target circle superimposed on the source image from the camera
         self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image, "bgr8"))
-        return circles != [], center_coordinates_and_radius
+        return circles != [], target
 
 if __name__ == "__main__":
     rospy.init_node("detector")
