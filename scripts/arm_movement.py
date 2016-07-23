@@ -23,7 +23,7 @@ class MoveArm:
     target_elbow1               = 0.0
     target_elbow2               = 0.0
     target_wrist                = 0.0
-    is_accomplished_elevator    = True
+    is_accomplished_elevator    = False
     is_accomplished_base        = False
     is_accomplished_shoulder    = False
     is_accomplished_elbow1      = False
@@ -91,14 +91,13 @@ class MoveArm:
         self.move_arm(0.0, 0.0, 1.5, 2.0, -2.0, 0.0)
 
     def elevator_controller(self, result):
-        return
-        # self.lock.acquire()
-        # self.is_accomplished_elevator = abs(self.target_elevator - result.process_value) <= (self.error_value + 0.02)
-        # self.lock.release()
-        # self.check_command_executed()
-    #     if self.is_accomplished_elevator:
-    #         rospy.loginfo("elevator")
-    #         rospy.loginfo(abs(self.target_elevator - result.process_value))
+        self.lock.acquire()
+        self.is_accomplished_elevator = abs(self.target_elevator - result.process_value) <= (self.error_value + 0.02)
+        self.lock.release()
+        self.check_command_executed()
+        # if not self.is_accomplished_elevator:
+        #     rospy.loginfo("elevator")
+        #     rospy.loginfo(abs(self.target_elevator - result.process_value))
 
     def base_controller(self, result):
         self.lock.acquire()
@@ -147,7 +146,8 @@ class MoveArm:
 
     def check_command_executed(self):
         if not self.response_sent:
-            check = (self.is_accomplished_base and \
+            check = (self.is_accomplished_elevator and \
+                self.is_accomplished_base and \
                 self.is_accomplished_shoulder and \
                 self.is_accomplished_elbow1 and \
                 self.is_accomplished_elbow2 and \

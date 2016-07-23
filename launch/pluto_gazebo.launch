@@ -42,8 +42,8 @@
   
 
   <node name="gripper"  pkg="pluto" type="grab.py"     output="screen" args="--is_simulation" respawn="true" />
-  <node name="arm_movement" pkg="pluto" type="moveArm.py"  output="screen" args="--is_simulation" respawn="true" /> 
-  <node name="movement" pkg="pluto" type="movement.py" output="screen" args="--is_simulation" respawn="true" />
+  <node name="arm_movement" pkg="pluto" type="arm_movement.py"  output="screen" args="--is_simulation" respawn="true" /> 
+  <node name="robot_movement" pkg="pluto" type="robot_movement.py" output="screen" args="--is_simulation" respawn="true" />
   <node name="detector" pkg="pluto" type="detector.py" output="screen" args="--is_simulation" respawn="true" />
   <node name="state_machine"   pkg="pluto" type="state_machine.py"  output="screen" args="--is_simulation" respawn="true" />
   
