@@ -80,7 +80,7 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <model name='ball_02'>
-      <pose>2 0 0.5 0 -0 0</pose>
+      <pose>2 -1 0 0 0 0</pose>
       <link name='link'>
         <inertial>
           <mass>0.057</mass>
@@ -96,7 +96,7 @@
         <collision name='collision'>
           <geometry>
             <sphere>
-              <radius>0.1</radius>
+              <radius>0.033</radius>
             </sphere>
           </geometry>
           <max_contacts>10</max_contacts>
@@ -138,21 +138,21 @@
       <real_time>38 892308814</real_time>
       <wall_time>1449944051 10683807</wall_time>
       <model name='ball_02'>
-        <pose>2 0 0.5 0 -0 0</pose>
+        <pose>2 0 0 0 0 0</pose>
         <link name='link'>
-          <pose>2 0 0.5 0 -0 0</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
+          <pose>2 0 0 0 0 0</pose>
+          <velocity>0 0 0 0 0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
-          <wrench>0 0 0 0 -0 0</wrench>
+          <wrench>0 0 0 0 0 0</wrench>
         </link>
       </model>
       <model name='ground_plane'>
-        <pose>0 0 0 0 -0 0</pose>
+        <pose>0 0 0 0 0 0</pose>
         <link name='link'>
-          <pose>0 0 0 0 -0 0</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>0 0 0 0 -0 0</acceleration>
-          <wrench>0 0 0 0 -0 0</wrench>
+          <pose>0 0 0 0 0 0</pose>
+          <velocity>0 0 0 0 0 0</velocity>
+          <acceleration>0 0 0 0 0 0</acceleration>
+          <wrench>0 0 0 0 0 0</wrench>
         </link>
       </model>
     </state>

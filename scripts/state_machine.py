@@ -19,7 +19,7 @@ class StateMachine:
         self.arm_movement_publisher = rospy.Publisher("/pluto/arm_movement/command", String, queue_size = 10)
         rospy.Subscriber("/pluto/arm_movement/result", String, self.arm_movement_done)
         self.camera_publisher = rospy.Publisher("/pluto/current_camera", String, queue_size = 10)
-        time.sleep(10) # allow moveArm.py to load before sending the first arm initialization command
+        time.sleep(15) # allow moveArm.py to load before sending the first arm initialization command
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")
 
