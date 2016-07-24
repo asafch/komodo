@@ -66,15 +66,15 @@ class RobotMovement:
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.03
+			return 0.1 # rad/s
 		else:
-			return 0.4
+			return 0.2 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:
-			return 0.03
+			return 0.05 # m/s
 		else:
-			return 0.2
+			return 0.15 # m/s
 
 	def move_robot(self, direction, lx, ly, lz, ax, ay, az):
 		self.movement_message.linear.x = lx

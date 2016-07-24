@@ -84,7 +84,7 @@ class Detector:
         params.filterByCircularity = True
         params.filterByArea = True
         params.minArea = 20.0
-        params.maxArea = 500.0
+        params.maxArea = 20000.0
         params.minConvexity = 0.87
         params.maxConvexity = 1.0
         params.minCircularity = 0.2

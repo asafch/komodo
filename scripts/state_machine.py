@@ -18,7 +18,8 @@ class StateMachine:
     search_ball_message_sent = False
     grab_message_sent = False
     bring_to_basket_message_sent = False
-
+    release_ball_message_sent = False 
+    
     def __init__(self):
         rospy.loginfo("State machine: initializing")
         self.state = "INIT_ARM"
@@ -27,7 +28,7 @@ class StateMachine:
         self.camera_publisher = rospy.Publisher("/pluto/detector/current_camera", String, queue_size = 10)
         self.camera_state_publisher = rospy.Publisher("/pluto/detector/state_change", String, queue_size = 10)
         self.robot_movement_publisher = rospy.Publisher("/pluto/robot_movement/command", String, queue_size = 10)
-        rospy.Subscriber("/pluto/robot_movement/result", String, self.robot_movement_done)
+        rospy.Subscriber("/pluto/robot_movement/result", String, self.robot_movement_result)
         time.sleep(20) # allow moveArm.py to load before sending the first arm initialization command
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")
@@ -37,8 +38,15 @@ class StateMachine:
             self.state = "SEARCH_BALL"
         elif command.data == "ARM_DEPLOYED":
             self.state = "GRAB"
+        elif command.data == "BALL_GRABBED":
+            self.state = "BRING_TO_BASKET"
+        elif command.data == "ARM_AT_BASKET":
+            self.state = "RELEASE_BALL"
+        elif command.data == "BALL_RELEASED":
+            self.state = "INIT_ARM"
+            self.arm_init_message_sent = False
 
-    def robot_movement_done(self, command):
+    def robot_movement_result(self, command):
         if command.data == "BALL_FOUND" and self.state == "SEARCH_BALL":
             self.state = "ADVANCE"
         elif command.data == "NO_BALL":
@@ -47,8 +55,6 @@ class StateMachine:
             self.state = "CENTER_THE_BALL"
         elif command.data == "BALL_AT_POSITION":
             self.state = "DEPLOY_ARM"
-        elif command.data == "BALL_GRABBED":
-            self.state = "BRING_TO_BASKET"
 
 
     def main_loop(self):
@@ -88,8 +94,12 @@ class StateMachine:
                 self.arm_movement_publisher.publish("GRAB")
             elif self.state == "BRING_TO_BASKET" and not self.bring_to_basket_message_sent:
                 self.bring_to_basket_message_sent = True
-                rospy.loginfo("State machine: state changed to BEING_TO_BASKET")
+                rospy.loginfo("State machine: state changed to BRING_TO_BASKET")
                 self.arm_movement_publisher.publish("BRING_TO_BASKET")
+            elif self.state == "RELEASE_BALL" and not self.release_ball_message_sent:
+                self.release_ball_message_sent = True
+                rospy.loginfo("State machine: state changed to RELEASE BALL")
+                self.arm_movement_publisher.publish("RELEASE_BALL")
 
 if __name__ == '__main__':
     try:
