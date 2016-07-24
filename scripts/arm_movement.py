@@ -11,12 +11,12 @@ from std_msgs.msg import String, Float64
 from pluto_common import *
 from control_msgs.msg import JointControllerState
 from dynamixel_msgs.msg import JointState as dxl_JointState
-from pluto.msg import DetectResult
 from pluto.srv import Grip
 
 class ArmMovement:
-    move_command = ""
-    response_sent = False
+    arm_movement_command = ""
+    fingers_movement_command = ""
+    arm_result_sent = False
     target_elevator             = 0.0
     target_base                 = 0.0
     target_shoulder             = 0.0
@@ -34,7 +34,8 @@ class ArmMovement:
     is_accomplished_elbow2      = False
     is_accomplished_wrist       = False
     error_value                 = 0.02
-    lock = None
+    arm_lock = None
+    fingers_lock = None
     elevator_subscriber = None
     base_subscriber = None
     shoulder_subscriber = None
@@ -43,14 +44,20 @@ class ArmMovement:
     wrist_subscriber = None
     lfinger_subscriber = None
     rfinger_subscriber = None
+    jointType = None
 
     def __init__(self):
         rospy.loginfo("Arm movement: initializing")
         init_arguments(self) 
-        self.lock = Lock()
+        self.arm_lock = Lock()
+        self.fingers_lock = Lock()
+        if self.is_simulation:
+            self.jointType = JointControllerState
+        else:
+            self.jointType = dxl_JointState
         #arm publisher and suscriber
         rospy.Subscriber("/pluto/arm_movement/command", String, self.process_command)
-        self.movement_result_publisher = rospy.Publisher("/pluto/arm_movement/result", String, queue_size = 10)
+        self.arm_movement_result_publisher = rospy.Publisher("/pluto/arm_movement/result", String, queue_size = 10)
         #joint command publishers
         self.elevator_publisher   = rospy.Publisher(pluto_add_namespace(self.is_simulation, "/elevator_controller/command"), Float64, queue_size = 10)
         self.base_publisher       = rospy.Publisher(pluto_add_namespace(self.is_simulation, "/base_rotation_controller/command"), Float64, queue_size = 10)
@@ -63,18 +70,18 @@ class ArmMovement:
         rospy.loginfo("Arm movement: initialized")
 
     def process_command(self, command):
-        self.move_command = command.data
-        self.response_sent = False
+        self.arm_movement_command = command.data
         rospy.loginfo("Arm movement: command received: %s", command.data)
-        self.initialize_subscribers()
-        if self.move_command == "INIT_ARM":
+        self.initialize_arm_subscribers()
+        if self.arm_movement_command == "INIT_ARM":
             self.init_arm()
-        elif self.move_command == "DEPLOY_ARM":
+        elif self.arm_movement_command == "DEPLOY_ARM":
             self.deploy_arm()
+        self.arm_result_sent = False
 
     def move_arm(self, elevator, base, shoulder, elbow1, elbow2, wrist):
-        self.lock.acquire()
-        is_accomplished_elevator         = False
+        self.arm_lock.acquire()
+        self.is_accomplished_elevator    = False
         self.is_accomplished_base        = False
         self.is_accomplished_shoulder    = False
         self.is_accomplished_elbow1      = False
@@ -92,119 +99,104 @@ class ArmMovement:
         self.elbow1_publisher.publish(elbow1)
         self.elbow2_publisher.publish(elbow2)
         self.wrist_publisher.publish(wrist)
-        self.lock.release()
+        self.arm_lock.release()
+
+    def move_fingers(self, position):
+        self.fingers_lock.acquire()
+        self.initialize_finger_subscribers()
+        self.fingers_result_sent = False
+        self.fingers_movement_command = position
+        if position == "OPEN_FINGERS":
+            rospy.loginfo("Arm movement: opening fingers")
+            target_lfinger = -0.5
+            target_rfinger = 0.5
+        elif position == "CLOSE_FINGERS":
+            rospy.loginfo("Arm movement: closing fingers")
+            target_lfinger = 0.2
+            target_rfinger = -0.2
+        is_accomplished_lfinger = False
+        is_accomplished_rfinger = False
+        self.lfinger_publisher.publish(self.target_lfinger)
+        self.rfinger_publisher.publish(self.target_rfinger)
+        self.fingers_lock.release()
 
     def open_fingers(self):
-        self.lock.acquire()
-        rospy.loginfo("Arm movement: opening fingers")
-        is_accomplished_lfinger = False
-        is_accomplished_rfinger = False
-        target_lfinger = -0.5
-        target_rfinger = 0.5
-        self.lfinger_publisher.publish(-0.5)
-        self.rfinger_publisher.publish(0.5)
-        self.lock.release()
+        self.move_fingers("OPEN_FINGERS")
 
     def close_fingers(self):
-        self.lock.acquire()
-        rospy.loginfo("Arm movement: closing fingers")
-        is_accomplished_lfinger = False
-        is_accomplished_rfinger = False
-        target_lfinger = 0.2
-        target_rfinger = -0.2
-        self.rfinger_publisher.publish(0.2)
-        self.rfinger_publisher.publish(-0.2)
-        self.lock.release()
+        self.move_fingers("CLOSE_FINGERS")
 
     def init_arm(self):
+        rospy.loginfo("Arm movement: initializing arm...")
         self.move_arm(0.0, 0.0, 1.5, 2.0, -2.0, 0.0)
         self.open_fingers()
 
     def deploy_arm(self):
-        self.move_arm(0.0, 0.0, 1.55, 0.0, 2.3, 0.0)
+        rospy.loginfo("Arm movement: deploying arm...")
+        self.move_arm(0.0, 0.0, 0.45, 0.0, 2.3, 0.0)
 
     def elevator_result(self, result):
-        self.lock.acquire()
+        self.arm_lock.acquire()
         self.is_accomplished_elevator = abs(self.target_elevator - result.process_value) <= self.error_value
-        self.lock.release()
-        self.check_command_executed()
-        # if not self.is_accomplished_elevator:
-        #     rospy.loginfo("elevator")
-        #     rospy.loginfo(abs(self.target_elevator - result.process_value))
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def base_result(self, result):
-        self.lock.acquire()
+        self.arm_lock.acquire()
         self.is_accomplished_base = abs(self.target_base - result.process_value) <= self.error_value
-        self.check_command_executed()
-        self.lock.release()
-        # if not self.is_accomplished_base:
-        #     rospy.loginfo("base")
-        #     rospy.loginfo(abs(self.target_base - result.process_value))
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def shoulder_result(self, result):
-        self.lock.acquire()
-        self.is_accomplished_shoulder = abs(self.target_shoulder - result.process_value) <= (self.error_value + 0.02)
-        self.check_command_executed()
-        self.lock.release()
-        # if not self.is_accomplished_shoulder:
-        #     rospy.loginfo("shoulder")
-        #     rospy.loginfo(abs(self.target_shoulder - result.process_value))
+        self.arm_lock.acquire()
+        self.is_accomplished_shoulder = abs(self.target_shoulder - result.process_value) <= self.error_value * 2.5
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def elbow1_result(self, result):
-        self.lock.acquire()
+        self.arm_lock.acquire()
         self.is_accomplished_elbow1 = abs(self.target_elbow1 - result.process_value) <= self.error_value
-        self.check_command_executed()
-        self.lock.release()
-        # if not self.is_accomplished_elbow1:
-        #     rospy.loginfo("elbow1")
-        #     rospy.loginfo(abs(self.target_elbow1 - result.process_value))
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def elbow2_result(self, result):
-        self.lock.acquire()
+        self.arm_lock.acquire()
         self.is_accomplished_elbow2 = abs(self.target_elbow2 - result.process_value) <= self.error_value
-        self.check_command_executed()
-        self.lock.release()
-        # if not self.is_accomplished_elbow2:
-        #     rospy.loginfo("elbow2")
-        #     rospy.loginfo(abs(self.target_elbow2 - result.process_value))
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def wrist_result(self, result):
-        self.lock.acquire()
+        self.arm_lock.acquire()
         self.is_accomplished_wrist = abs(self.target_wrist - result.process_value) <= self.error_value
-        self.check_command_executed()
-        self.lock.release()
-        # if not self.is_accomplished_wrist:
-        #     rospy.loginfo("wrist")
-        #     rospy.loginfo(abs(self.target_wrist - result.process_value))
+        self.check_arm_command_executed()
+        self.arm_lock.release()
 
     def lfinger_result(self, result):
-        self.lock.acquire()
-        self.is_accomplished_wrist = abs(self.target_lfinger - result.process_value) <= self.error_value
-        self.check_fingers()
-        self.lock.release()
+        self.fingers_lock.acquire()
+        self.is_accomplished_lfinger = abs(self.target_lfinger - result.process_value) <= self.error_value * 2
+        self.check_fingers_command_executed()
+        self.fingers_lock.release()
 
     def rfinger_result(self, result):
-        self.lock.acquire()
-        self.is_accomplished_rfinger = abs(self.target_rfinger - result.process_value) <= self.error_value
-        self.check_fingers()
-        self.lock.release()
+        self.fingers_lock.acquire()
+        self.is_accomplished_rfinger = abs(self.target_rfinger - result.process_value) <= self.error_value * 2
+        self.check_fingers_command_executed()
+        self.fingers_lock.release()
 
-    def initialize_subscribers(self):
-        if self.is_simulation:
-            JointType = JointControllerState
-        else:
-            JointType = dxl_JointState
+    def initialize_arm_subscribers(self):
         #joint state suscribers
-        self.elevator_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elevator_controller/state"), JointType, self.elevator_result)
-        self.base_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/base_rotation_controller/state"), JointType, self.base_result)
-        self.shoulder_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/shoulder_controller/state"), JointType, self.shoulder_result)
-        self.elbow1_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elbow1_controller/state"), JointType, self.elbow1_result)
-        self.elbow2_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elbow2_controller/state"), JointType, self.elbow2_result)
-        self.wrist_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/wrist_controller/state"), JointType, self.wrist_result)
-        self.lfinger_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/left_finger_controller/state"), JointType, self.lfinger_result)
-        self.rfinger_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/right_finger_controller/state"), JointType, self.rfinger_result)
+        self.elevator_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elevator_controller/state"), self.jointType, self.elevator_result)
+        self.base_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/base_rotation_controller/state"), self.jointType, self.base_result)
+        self.shoulder_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/shoulder_controller/state"), self.jointType, self.shoulder_result)
+        self.elbow1_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elbow1_controller/state"), self.jointType, self.elbow1_result)
+        self.elbow2_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/elbow2_controller/state"), self.jointType, self.elbow2_result)
+        self.wrist_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/wrist_controller/state"), self.jointType, self.wrist_result)
+
+    def initialize_finger_subscribers(self):
+        self.lfinger_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/left_finger_controller/state"), self.jointType, self.lfinger_result)
+        self.rfinger_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/right_finger_controller/state"), self.jointType, self.rfinger_result)
     
-    def shutdown_subscribers(self):
+    def shutdown_arm_subscribers(self):
         self.elevator_subscriber.unregister()
         self.base_subscriber.unregister()
         self.shoulder_subscriber.unregister()
@@ -212,14 +204,22 @@ class ArmMovement:
         self.elbow2_subscriber.unregister()
         self.wrist_subscriber.unregister()
 
-    def check_fingers(self):
-        if self.is_accomplished_lfinger and self.is_accomplished_rfinger:
-            rospy.loginfo("Arm movement: fingers at position")
-            self.lfinger_subscriber.unregister()
-            self.rfinger_subscriber.unregister()
+    def shutdown_finger_subscribers(self):
+        self.lfinger_subscriber.unregister()
+        self.rfinger_subscriber.unregister()
 
-    def check_command_executed(self):
-        if not self.response_sent:
+    def check_fingers_command_executed(self):
+        # rospy.loginfo("fingers %r", self.fingers_result_sent)
+        if not self.fingers_result_sent:
+            check = self.is_accomplished_lfinger and self.is_accomplished_rfinger
+            if check:
+                self.shutdown_finger_subscribers()
+                # self.arm_movement_result_publisher.publish("FINGERS_???")
+                rospy.loginfo("Arm movement: fingers are %s", self.fingers_movement_command)
+                self.fingers_result_sent = True
+
+    def check_arm_command_executed(self):
+        if not self.arm_result_sent:
             check = (self.is_accomplished_elevator and \
                 self.is_accomplished_base and \
                 self.is_accomplished_shoulder and \
@@ -227,10 +227,14 @@ class ArmMovement:
                 self.is_accomplished_elbow2 and \
                 self.is_accomplished_wrist)
             if check:
-                self.shutdown_subscribers()
-                self.movement_result_publisher.publish("ARM_INIT_DONE")
-                rospy.loginfo("Arm movement: initialization complete")
-                self.response_sent = True
+                self.shutdown_arm_subscribers()
+                if self.arm_movement_command == "INIT_ARM":
+                    self.arm_movement_result_publisher.publish("ARM_INITIALIZED")
+                    rospy.loginfo("Arm movement: initialization complete")
+                elif self.arm_movement_command == "DEPLOY_ARM":
+                    self.arm_movement_result_publisher.publish("ARM_DEPLOYED")
+                    rospy.loginfo("Arm movement: arm deployed")
+                self.arm_result_sent = True
 
 
 if __name__ == "__main__":

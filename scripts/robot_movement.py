@@ -62,7 +62,7 @@ class RobotMovement:
 		self.movement_message = Twist()
 		self.movement_publisher.publish(self.movement_message)
 		self.state_machine_publisher.publish(cause)
-		rospy.loginfo("Robot movement: %s", cause)
+		rospy.loginfo("Robot movement: stop in place, cause: %s", cause)
 		self.fine_movement = True
 
 	def get_anguler_speed(self):

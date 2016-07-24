@@ -2,9 +2,7 @@
 
 import roslib
 import rospy
-from sensor_msgs.msg import LaserScan, Range
-from std_msgs.msg import String, Bool
-from pluto.msg import DetectResult
+from std_msgs.msg import String
 import time
 from pluto_common import *
 
@@ -17,6 +15,8 @@ class StateMachine:
     advance_message_sent = False
     front_camera_message_sent = False
     deploy_arm_message_sent = False
+    search_ball_message_sent = False
+    grab_message_sent = False
 
     def __init__(self):
         rospy.loginfo("State machine: initializing")
@@ -32,14 +32,10 @@ class StateMachine:
         rospy.loginfo("State machine: state is INIT_ARM")
 
     def arm_movement_result(self, command):
-        if command.data == "ARM_INIT_DONE":
+        if command.data == "ARM_INITIALIZED":
             self.state = "SEARCH_BALL"
-            self.robot_movement_publisher.publish("SEARCH_BALL")
-            self.camera_state_publisher.publish("SEARCH")
-            self.camera_publisher.publish("ASUS_CAMERA")
-            rospy.loginfo("State machine: state changed to SEARCH_BALL")
         elif command.data == "ARM_DEPLOYED":
-            rospy.loginfo("grabbing")
+            self.state = "GRAB"
 
     def robot_movement_done(self, command):
         if command.data == "BALL_FOUND" and self.state == "SEARCH_BALL":
@@ -62,10 +58,16 @@ class StateMachine:
             elif self.state == "ADVANCE" and not self.advance_message_sent:
                 self.advance_message_sent = True
                 rospy.loginfo("State machine: state changed to ADVANCE")
-                # self.camera_publisher.publish("FRONT_CAMERA")
                 self.robot_movement_publisher.publish("FORWARD")
             elif self.state == "END":
+                rospy.loginfo("State machine: state changed to END")
                 rospy.signal_shutdown("State machine: no ball found, exiting...")
+            elif self.state == "SEARCH_BALL" and not self.search_ball_message_sent:
+                self.search_ball_message_sent = True
+                self.robot_movement_publisher.publish("SEARCH_BALL")
+                self.camera_state_publisher.publish("SEARCH")
+                self.camera_publisher.publish("ASUS_CAMERA")
+                rospy.loginfo("State machine: state changed to SEARCH_BALL")
             elif self.state == "CENTER_THE_BALL" and not self.front_camera_message_sent:
                 self.front_camera_message_sent = True
                 rospy.loginfo("State machine: state changed to CENTER_THE_BALL")
@@ -73,8 +75,13 @@ class StateMachine:
             elif self.state == "DEPLOY_ARM" and not self.deploy_arm_message_sent:
                 self.deploy_arm_message_sent = True
                 rospy.loginfo("State machine: state changed to DEPLOY_ARM")
-                self.camera_publisher.publish("CREATIVE_CAMERA")
                 self.arm_movement_publisher.publish("DEPLOY_ARM")
+                self.camera_state_publisher.publish("NO_SEARCH")
+            elif self.state == "GRAB" and not self.grab_message_sent:
+                self.grab_message_sent = True
+                rospy.loginfo("State machine: state changed to GRAB")
+                self.camera_publisher.publish("CREATIVE_CAMERA")
+                self.camera_state_publisher.publish("SEARCH")
 
 if __name__ == '__main__':
     try:
