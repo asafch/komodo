@@ -5,7 +5,7 @@ from pluto.srv import Grip
 from std_msgs.msg import Float64
 from std_msgs.msg import String
 from dynamixel_msgs.msg import JointState as dxl_JointState
-from pluto_common import *
+from common import *
 #from control_msgs.msg import JointControllerState as dxl_JointState
 
 def lf_callback(data):
@@ -65,12 +65,12 @@ def gripper_server():
 		rospy.init_node('gripper_server')
 		global pub_left_finger
 		global pub_right_finger
-		pub_left_finger = rospy.Publisher(pluto_add_namespace( is_simulation,'/left_finger_controller/command'), Float64, queue_size=10)
-		pub_right_finger = rospy.Publisher(pluto_add_namespace( is_simulation,'/right_finger_controller/command'), Float64, queue_size=10)
+		pub_left_finger = rospy.Publisher(adjust_namespace( is_simulation,'/left_finger_controller/command'), Float64, queue_size=10)
+		pub_right_finger = rospy.Publisher(adjust_namespace( is_simulation,'/right_finger_controller/command'), Float64, queue_size=10)
 		#rospy.Subscriber('/komodo_1/left_finger_controller/state', Float64, lf_callback)
 		#rospy.Subscriber('/komodo_1/right_finger_controller/state', Float64, rf_callback)
-		rospy.Subscriber(pluto_add_namespace( is_simulation,'/left_finger_controller/state'), dxl_JointState, lf_callback)
-		rospy.Subscriber(pluto_add_namespace( is_simulation,'/right_finger_controller/state'), dxl_JointState, rf_callback)
+		rospy.Subscriber(adjust_namespace( is_simulation,'/left_finger_controller/state'), dxl_JointState, lf_callback)
+		rospy.Subscriber(adjust_namespace( is_simulation,'/right_finger_controller/state'), dxl_JointState, rf_callback)
 		s = rospy.Service('gripper', Grip, handle_gripper)
 		rospy.spin()
  

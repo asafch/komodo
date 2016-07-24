@@ -6,7 +6,7 @@ import time
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String
-from pluto_common import *
+from common import *
 from tf.transformations import euler_from_quaternion
 
 class RobotMovement:
@@ -26,9 +26,9 @@ class RobotMovement:
 	def __init__(self):
 		init_arguments(self)
 		self.movement_subscriber = rospy.Subscriber("pluto/robot_movement/command", String, self.process_command)
-		self.movement_publisher = rospy.Publisher("/diff_driver/command", Twist, queue_size = 10)
+		self.movement_publisher = rospy.Publisher(adjust_namespace(self.is_simulation, "/diff_driver/command"), Twist, queue_size = 10)
 		self.state_machine_publisher = rospy.Publisher("/pluto/robot_movement/result", String, queue_size = 10)
-		self.odometry_subscriber = rospy.Subscriber(pluto_add_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
+		self.odometry_subscriber = rospy.Subscriber(adjust_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
 		self.movement_message = Twist()
 
 	def odometry_updated(self, message):
@@ -63,17 +63,16 @@ class RobotMovement:
 		self.movement_publisher.publish(self.movement_message)
 		self.state_machine_publisher.publish(cause)
 		rospy.loginfo("Robot movement: stop in place, cause: %s", cause)
-		self.fine_movement = True
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.1
+			return 0.03
 		else:
-			return 0.5
+			return 0.4
 
 	def get_linear_speed(self):
 		if self.fine_movement:
-			return 0.1
+			return 0.03
 		else:
 			return 0.2
 
@@ -92,10 +91,12 @@ class RobotMovement:
 			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 			self.update_reference_odometry = True
 			self.searching_for_ball = True
+			self.fine_movement = False
 		elif command.data == "STOP-BALL_FOUND":
 			self.stop_in_place("BALL_FOUND")
 		elif command.data == "STOP-BALL_AT_BOTTOM_OF_FRAME":
 			self.stop_in_place("BALL_AT_BOTTOM_OF_FRAME")
+			self.fine_movement = True
 		elif command.data == "STOP-BALL_AT_POSITION":
 			self.stop_in_place("BALL_AT_POSITION")
 		elif command.data == "LEFT":

@@ -4,7 +4,7 @@ import roslib
 import rospy
 from std_msgs.msg import String
 import time
-from pluto_common import *
+from common import *
 
 class StateMachine:
     state = ""
@@ -17,6 +17,7 @@ class StateMachine:
     deploy_arm_message_sent = False
     search_ball_message_sent = False
     grab_message_sent = False
+    bring_to_basket_message_sent = False
 
     def __init__(self):
         rospy.loginfo("State machine: initializing")
@@ -46,6 +47,8 @@ class StateMachine:
             self.state = "CENTER_THE_BALL"
         elif command.data == "BALL_AT_POSITION":
             self.state = "DEPLOY_ARM"
+        elif command.data == "BALL_GRABBED":
+            self.state = "BRING_TO_BASKET"
 
 
     def main_loop(self):
@@ -80,8 +83,13 @@ class StateMachine:
             elif self.state == "GRAB" and not self.grab_message_sent:
                 self.grab_message_sent = True
                 rospy.loginfo("State machine: state changed to GRAB")
-                self.camera_publisher.publish("CREATIVE_CAMERA")
-                self.camera_state_publisher.publish("SEARCH")
+                # self.camera_publisher.publish("CREATIVE_CAMERA")
+                # self.camera_state_publisher.publish("SEARCH")
+                self.arm_movement_publisher.publish("GRAB")
+            elif self.state == "BRING_TO_BASKET" and not self.bring_to_basket_message_sent:
+                self.bring_to_basket_message_sent = True
+                rospy.loginfo("State machine: state changed to BEING_TO_BASKET")
+                self.arm_movement_publisher.publish("BRING_TO_BASKET")
 
 if __name__ == '__main__':
     try:

@@ -8,8 +8,8 @@ def init_arguments(self):
     (options, args) = parser.parse_known_args()
     self.is_simulation = options.is_simulation
 
-def pluto_add_namespace(is_simulation, topic):
-    if True == is_simulation:
+def adjust_namespace(is_simulation, topic):
+    if is_simulation:
         return topic
     else:
         return "/komodo_1/komodo_1" + topic

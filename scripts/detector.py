@@ -6,8 +6,7 @@ import numpy as np
 import cv_bridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
-from pluto.msg import DetectResult
-from pluto_common import *
+from common import *
 
 class Detector:
 
@@ -15,7 +14,7 @@ class Detector:
     camera_subscription = None
     bridge = None
     processed_image_publisher = None
-    offset = 5
+    offset = 3
     wheel_publisher = None
     state = ""
     ball_at_middle_Y_of_Asus_Camera = False
@@ -24,6 +23,7 @@ class Detector:
     ball_positioned = False
 
     def __init__(self):
+        init_arguments(self)
         self.state = "NO_SEARCH"
         rospy.Subscriber("/pluto/detector/current_camera", String, self.camera_change)
         rospy.Subscriber("/pluto/detector/state_change", String, self.state_change)
@@ -37,11 +37,11 @@ class Detector:
         if self.camera_subscription:
             self.camera_subscription.unregister()
         if self.current_camera == "ASUS_CAMERA":
-            self.camera_subscription = rospy.Subscriber("/Asus_Camera/rgb/image_raw", Image, self.process_image)
+            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Asus_Camera/rgb/image_raw"), Image, self.process_image)
         elif self.current_camera == "CREATIVE_CAMERA":
-            self.camera_subscription = rospy.Subscriber("/Creative_Camera/rgb/image_raw", Image, self.process_image)
+            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Creative_Camera/rgb/image_raw"), Image, self.process_image)
         elif self.current_camera == "FRONT_CAMERA":
-            self.camera_subscription = rospy.Subscriber("/Front_Camera/image_raw", Image, self.process_image)
+            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Front_Camera/image_raw"), Image, self.process_image)
 
     def state_change(self, command):
         if command.data == "SEARCH":
@@ -83,8 +83,8 @@ class Detector:
         params.filterByColor = False
         params.filterByCircularity = True
         params.filterByArea = True
-        params.minArea = 15.0
-        params.maxArea = 20000.0
+        params.minArea = 20.0
+        params.maxArea = 500.0
         params.minConvexity = 0.87
         params.maxConvexity = 1.0
         params.minCircularity = 0.2
