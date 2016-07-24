@@ -71,6 +71,7 @@ class ArmMovement:
         rospy.loginfo("Arm movement: command received: %s", command.data)
         if command.data == "INIT_ARM":
             self.init_arm()
+            self.fingers_movement_command = "OPEN_FINGERS"
             self.arm_result_sent = False
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
@@ -80,6 +81,7 @@ class ArmMovement:
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
         elif command.data == "GRAB":
+            self.fingers_movement_command = "CLOSE_FINGERS"
             self.close_fingers()
         elif command.data == "BRING_TO_BASKET":
             self.bring_to_basket()
@@ -87,9 +89,8 @@ class ArmMovement:
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
         elif command.data == "RELEASE_BALL":
+            self.fingers_movement_command = "RELEASE_BALL"
             self.open_fingers()
-            rospy.loginfo("Arm movement: ball released")
-            self.arm_movement_result_publisher.publish("BALL_RELEASED")
                     
     def move_arm(self, elevator, base, shoulder, elbow1, elbow2, wrist):
         self.arm_lock.acquire()
@@ -123,15 +124,14 @@ class ArmMovement:
         self.fingers_lock.acquire()
         self.initialize_finger_subscribers()
         self.fingers_result_sent = False
-        self.fingers_movement_command = position
         if position == "OPEN_FINGERS":
             rospy.loginfo("Arm movement: opening fingers")
-            target_lfinger = -1.0
-            target_rfinger = 1.0
+            target_lfinger = -0.2
+            target_rfinger = 0.2
         elif position == "CLOSE_FINGERS":
             rospy.loginfo("Arm movement: closing fingers")
-            target_lfinger = 0.5
-            target_rfinger = -0.5
+            target_lfinger = 0.15
+            target_rfinger = -0.15
         is_accomplished_lfinger = False
         is_accomplished_rfinger = False
         self.lfinger_publisher.publish(self.target_lfinger)
@@ -151,7 +151,7 @@ class ArmMovement:
 
     def deploy_arm(self):
         rospy.loginfo("Arm movement: deploying arm...")
-        self.move_arm(0.0, 0.0, 1.55, 0.0, 1.47, 0.0)
+        self.move_arm(0.0, 0.0, 1.5, 0.0, 1.0, 0.0)
 
     def bring_to_basket(self):
         rospy.loginfo("Arm movement: bringing to basket...")
@@ -267,9 +267,13 @@ class ArmMovement:
         if not self.fingers_result_sent:
             if self.is_accomplished_lfinger and self.is_accomplished_rfinger:
                 self.shutdown_finger_subscribers()
-                rospy.loginfo("Arm movement: fingers are %s", self.fingers_movement_command)
                 if self.fingers_movement_command == "CLOSE_FINGERS":
                     self.arm_movement_result_publisher.publish("BALL_GRABBED")
+                elif self.fingers_movement_command == "RELEASE_BALL":
+                    rospy.loginfo("Arm movement: ball released")
+                    self.arm_movement_result_publisher.publish("BALL_RELEASED")
+                    self.arm_movement_command = "OPEN_FINGERS"
+                rospy.loginfo("Arm movement: fingers are %s", self.fingers_movement_command)
                 self.fingers_result_sent = True
 
     def check_group1_executed(self):

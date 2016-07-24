@@ -33,6 +33,16 @@ class StateMachine:
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")
 
+    def reset_flags(self):
+        self.advance_message_sent = False
+        self.front_camera_message_sent = False
+        self.deploy_arm_message_sent = False
+        self.search_ball_message_sent = False
+        self.grab_message_sent = False
+        self.bring_to_basket_message_sent = False
+        self.release_ball_message_sent = False 
+        self.arm_init_message_sent = False
+        
     def arm_movement_result(self, command):
         if command.data == "ARM_INITIALIZED":
             self.state = "SEARCH_BALL"
@@ -43,8 +53,8 @@ class StateMachine:
         elif command.data == "ARM_AT_BASKET":
             self.state = "RELEASE_BALL"
         elif command.data == "BALL_RELEASED":
+            self.reset_flags()
             self.state = "INIT_ARM"
-            self.arm_init_message_sent = False
 
     def robot_movement_result(self, command):
         if command.data == "BALL_FOUND" and self.state == "SEARCH_BALL":
@@ -98,7 +108,7 @@ class StateMachine:
                 self.arm_movement_publisher.publish("BRING_TO_BASKET")
             elif self.state == "RELEASE_BALL" and not self.release_ball_message_sent:
                 self.release_ball_message_sent = True
-                rospy.loginfo("State machine: state changed to RELEASE BALL")
+                rospy.loginfo("State machine: state changed to RELEASE_BALL")
                 self.arm_movement_publisher.publish("RELEASE_BALL")
 
 if __name__ == '__main__':
