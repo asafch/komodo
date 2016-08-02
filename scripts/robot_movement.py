@@ -35,7 +35,7 @@ class RobotMovement:
 		if self.update_reference_odometry:
 			self.last_orientation = self.odometry_get_angle(message)
 			self.update_reference_odometry = False
-			time.sleep(5)
+			time.sleep(3)
 		elif self.searching_for_ball:
 			if abs(self.last_orientation - self.odometry_get_angle(message)) >= self.angular_offset * 2:
 				self.prepared_to_stop = True
@@ -68,7 +68,7 @@ class RobotMovement:
 		if self.fine_movement:
 			return 0.2 # rad/s
 		else:
-			return 0.3 # rad/s
+			return 0.35 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:
@@ -88,6 +88,7 @@ class RobotMovement:
 
 	def process_command(self, command):
 		if command.data == "SEARCH_BALL":
+			rospy.loginfo("Robot movement: searching for ball")
 			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 			self.update_reference_odometry = True
 			self.searching_for_ball = True

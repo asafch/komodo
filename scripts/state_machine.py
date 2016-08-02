@@ -2,6 +2,7 @@
 
 import roslib
 import rospy
+import sys
 from std_msgs.msg import String
 import time
 from common import *
@@ -79,8 +80,10 @@ class StateMachine:
                 rospy.loginfo("State machine: state changed to ADVANCE")
                 self.robot_movement_publisher.publish("FORWARD")
             elif self.state == "END":
+                self.camera_state_publisher.publish("NO_SEARCH")
                 rospy.loginfo("State machine: state changed to END")
-                rospy.signal_shutdown("State machine: no ball found, exiting...")
+                rospy.loginfo("State machine: no ball found, exiting...")
+                sys.exit(0)
             elif self.state == "SEARCH_BALL" and not self.search_ball_message_sent:
                 self.search_ball_message_sent = True
                 self.robot_movement_publisher.publish("SEARCH_BALL")

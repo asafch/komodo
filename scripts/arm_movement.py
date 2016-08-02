@@ -2,16 +2,13 @@
 import sys
 import copy
 import rospy
-import moveit_commander
-import moveit_msgs.msg
 import geometry_msgs.msg
 import time
-from threading import Lock, Semaphore
+from threading import Lock
 from std_msgs.msg import String, Float64
 from common import *
 from control_msgs.msg import JointControllerState
 from dynamixel_msgs.msg import JointState as dxl_JointState
-from pluto.srv import Grip
 
 class ArmMovement:
     arm_movement_command = ""
@@ -147,14 +144,14 @@ class ArmMovement:
         self.fingers_result_sent = False
         if position == "OPEN_FINGERS":
             rospy.loginfo("Arm movement: opening fingers")
-            target_lfinger = -0.2
-            target_rfinger = 0.2
+            self.target_lfinger = -0.2
+            self.target_rfinger = 0.2
         elif position == "CLOSE_FINGERS":
             rospy.loginfo("Arm movement: closing fingers")
-            target_lfinger = 0.15
-            target_rfinger = -0.15
-        is_accomplished_lfinger = False
-        is_accomplished_rfinger = False
+            self.target_lfinger = 0.15
+            self.target_rfinger = -0.15
+        self.is_accomplished_lfinger = False
+        self.is_accomplished_rfinger = False
         self.lfinger_publisher.publish(self.target_lfinger)
         self.rfinger_publisher.publish(self.target_rfinger)
         self.fingers_lock.release()
@@ -310,7 +307,7 @@ class ArmMovement:
                     rospy.loginfo("Arm movement: arm deployed")
                     self.arm_result_sent = True
                 else:
-                    rospy.logwarn("Arm movement: illegal arm state")
+                    rospy.logwarn("Arm movement: illegal arm state, group 1")
 
     def check_group2_executed(self):
         # if not self.arm_result_sent and self.group1_executed:
@@ -330,7 +327,7 @@ class ArmMovement:
                         rospy.loginfo("Arm movement: arm at basket")
                         self.arm_result_sent = True
                     else:
-                        rospy.logwarn("Arm movement: illegal arm state")
+                        rospy.logwarn("Arm movement: illegal arm state, group 2")
 
 
 if __name__ == "__main__":

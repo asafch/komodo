@@ -8,7 +8,7 @@
   <node name="arm_movement" pkg="pluto" type="arm_movement.py"  output="screen" args="" respawn="true" /> 
   <node name="robot_movement" pkg="pluto" type="robot_movement.py" output="screen" args="" respawn="true" />
   <node name="detector" pkg="pluto" type="detector.py" output="screen" args="" respawn="true" />
-  <node name="state_machine"   pkg="pluto" type="state_machine.py"  output="screen" args="" respawn="true" />
+  <node name="state_machine"   pkg="pluto" type="state_machine.py"  output="screen" args="" respawn="false" />
   
 	
 </launch>
