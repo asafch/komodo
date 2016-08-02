@@ -25,7 +25,7 @@ class RobotMovement:
 
 	def __init__(self):
 		init_arguments(self)
-		self.movement_subscriber = rospy.Subscriber("pluto/robot_movement/command", String, self.process_command)
+		self.movement_subscriber = rospy.Subscriber("/pluto/robot_movement/command", String, self.process_command)
 		self.movement_publisher = rospy.Publisher(adjust_namespace(self.is_simulation, "/diff_driver/command"), Twist, queue_size = 10)
 		self.state_machine_publisher = rospy.Publisher("/pluto/robot_movement/result", String, queue_size = 10)
 		self.odometry_subscriber = rospy.Subscriber(adjust_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
@@ -66,9 +66,9 @@ class RobotMovement:
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.1 # rad/s
-		else:
 			return 0.2 # rad/s
+		else:
+			return 0.3 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:

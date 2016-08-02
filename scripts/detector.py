@@ -22,6 +22,8 @@ class Detector:
     ball_at_proper_Y_of_Front_Camera = False
     ball_at_proper_X_of_Front_Camera = False
     ball_positioned = False
+    front_camera_x_reference = 0
+    front_camera_y_reference = 0
 
     def __init__(self):
         init_arguments(self)
@@ -32,6 +34,9 @@ class Detector:
         self.processed_image_publisher = rospy.Publisher("/pluto/processed_image", Image, queue_size = 10)
         self.processed_image_bw_publisher = rospy.Publisher("/pluto/processed_image_bw", Image, queue_size = 10)
         self.wheel_publisher = rospy.Publisher("pluto/robot_movement/command", String, queue_size = 10)
+        # the image resolution of the front camera varies between the real camera and the simulated one
+        self.front_camera_x_reference = 1080 if self.is_simulation else 107
+        self.front_camera_y_reference = 1190 if self.is_simulation else 160
 
     def camera_change(self, command):
         self.current_camera = command.data
@@ -45,9 +50,9 @@ class Detector:
             self.ball_positioned = False
             self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Asus_Camera/rgb/image_raw"), Image, self.process_image)
         elif self.current_camera == "CREATIVE_CAMERA":
-            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Creative_Camera/rgb/image_raw"), Image, self.process_image)
+            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Creative_Camera/rgb/image_raw" if self.is_simulation else "/arm_cam_node/image_raw"), Image, self.process_image)
         elif self.current_camera == "FRONT_CAMERA":
-            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Front_Camera/image_raw"), Image, self.process_image)
+            self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Front_Camera/image_raw" if self.is_simulation else "/front_cam_node/image_raw"), Image, self.process_image)
 
     def state_change(self, command):
         if command.data == "SEARCH":
@@ -81,15 +86,14 @@ class Detector:
 
         bw_image = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
         params = cv2.SimpleBlobDetector_Params()
-        im = bw_image
         params.filterByInertia = False
         params.filterByConvexity = True
-        params.filterByColor = False
+        params.filterByColor = False # online sources indicate that this feature isn't working properly, hence the manual color filtration used earlier in the code
         params.filterByCircularity = True
         params.filterByArea = True
-        params.minArea = 20.0
+        params.minArea = 100.0
         params.maxArea = 20000.0
-        params.minConvexity = 0.87
+        params.minConvexity = 0.6
         params.maxConvexity = 1.0
         params.minCircularity = 0.2
         # Create a detector with the parameters, according to your OpenCV version (2 or 3)
@@ -117,10 +121,10 @@ class Detector:
                     max_r       = circle[2]
                     max_circle  = circle
             target = max_circle
-        processed_image_bw = cv2.drawKeypoints(im, keypoints, np.array([]), (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        processed_image_bw = cv2.drawKeypoints(bw_image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         center = (target[0], target[1])
         cv2.circle(processed_image_bw, center, target[2], (255, 0, 0), 1, 8, 0)
-        processed_image = cv2.drawKeypoints(image_cv, keypoints, np.array([]), (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        processed_image = cv2.drawKeypoints(image_cv, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         cv2.circle(processed_image, center, target[2], (255, 0, 0), 1, 8, 0)
         # publish the keypoints and target circle superimposed on the source image from the camera
         self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image, "bgr8"))
@@ -131,25 +135,25 @@ class Detector:
             self.wheel_publisher.publish("STOP-BALL_FOUND")
             rospy.loginfo("Detector: ball found")
             # self.state = "NO_SEARCH"
-        elif max_circle != None and self.current_camera == "ASUS_CAMERA" and abs(target[1] - (image.height)) < image.height / 20:
+        elif max_circle != None and self.current_camera == "ASUS_CAMERA" and abs(target[1] - (image.height)) < image.height / 20.0 and self.ball_at_middle_Y_of_Asus_Camera:
             # self.ball_at_middle_Y_of_Asus_Camera = True
             self.wheel_publisher.publish("STOP-BALL_AT_BOTTOM_OF_FRAME")
             rospy.loginfo("Detector: ball is at bottom of Asus Camera frame")
             # self.state = "NO_SEARCH"
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - 1190) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
             if target[1] - 1190 > 0:
                 self.wheel_publisher.publish("BACKWARD")
             else:
                 self.wheel_publisher.publish("FORWARD")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - 1190) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
             self.ball_at_proper_Y_of_Front_Camera = True
             self.wheel_publisher.publish("STOP-BALL_FOUND")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - 1080) > self.offset and not self.ball_at_proper_X_of_Front_Camera:
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera:
             if target[0] - 1080 > 0:
                 self.wheel_publisher.publish("RIGHT")
             else:
                 self.wheel_publisher.publish("LEFT")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - 1080) < self.offset and not self.ball_at_proper_X_of_Front_Camera and not self.ball_positioned:
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and not self.ball_positioned:
             self.ball_at_proper_X_of_Front_Camera = True
             self.ball_positioned = True
             self.wheel_publisher.publish("STOP-BALL_AT_POSITION")

@@ -45,6 +45,9 @@ class ArmMovement:
     lfinger_subscriber = None
     rfinger_subscriber = None
     jointType = None
+    first_group_moving = 0
+    group1_executed = False
+    group2_executed = False
 
     def __init__(self):
         rospy.loginfo("Arm movement: initializing")
@@ -75,11 +78,17 @@ class ArmMovement:
             self.arm_result_sent = False
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
+            self.first_group_moving = 1
+            self.group1_executed = False
+            self.group2_executed = False
         elif command.data == "DEPLOY_ARM":
             self.deploy_arm()
             self.arm_result_sent = False
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
+            self.first_group_moving = 2
+            self.group1_executed = False
+            self.group2_executed = False
         elif command.data == "GRAB":
             self.fingers_movement_command = "CLOSE_FINGERS"
             self.close_fingers()
@@ -88,11 +97,14 @@ class ArmMovement:
             self.arm_result_sent = False
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
+            self.first_group_moving = 1
+            self.group1_executed = False
+            self.group2_executed = False
         elif command.data == "RELEASE_BALL":
             self.fingers_movement_command = "RELEASE_BALL"
             self.open_fingers()
                     
-    def move_arm(self, elevator, base, shoulder, elbow1, elbow2, wrist):
+    def move_arm(self, first_group, elevator, base, shoulder, elbow1, elbow2, wrist):
         self.arm_lock.acquire()
         self.group1_executed = False
         # self.is_accomplished_elevator    = False
@@ -107,14 +119,23 @@ class ArmMovement:
         self.target_elbow1 = elbow1
         self.target_elbow2 = elbow2
         self.target_wrist = wrist
-        self.move_group1()
+        if first_group == "GROUP_1":
+            self.first_group_moving = 1
+            self.move_group1()
+        else:
+            self.first_group_moving = 2
+            self.move_group2()
         self.arm_lock.release()
 
+    # Dividing the joints into groups is necessary in order to avoid physical contact between the arm and elevator.
+    # When initializing the arm or bringing it to the basket group 1 moves first; when deploying the arm group 2 moves first. 
     def move_group1(self):
         # self.elevator_publisher.publish(self.target_elevator)
         self.base_publisher.publish(self.target_base)
         self.shoulder_publisher.publish(self.target_shoulder)
 
+    # Dividing the joints into groups is necessary in order to avoid physical contact between the arm and elevator.
+    # When initializing the arm or bringing it to the basket group 1 moves first; when deploying the arm group 2 moves first. 
     def move_group2(self):
         self.elbow1_publisher.publish(self.target_elbow1)
         self.elbow2_publisher.publish(self.target_elbow2)
@@ -146,16 +167,16 @@ class ArmMovement:
 
     def init_arm(self):
         rospy.loginfo("Arm movement: initializing arm...")
-        self.move_arm(0.0, -1.0, 0.0, 1.5, -2.44, 1.6)
+        self.move_arm("GROUP_1", 0.0, -1.0, 0.0, 1.5, -2.44, 1.6)
         self.open_fingers()
 
     def deploy_arm(self):
         rospy.loginfo("Arm movement: deploying arm...")
-        self.move_arm(0.0, 0.0, 1.5, 0.0, 1.0, 0.0)
+        self.move_arm("GROUP_2", 0.0, 0.0, 1.5, 0.0, 1.0, 0.0)
 
     def bring_to_basket(self):
         rospy.loginfo("Arm movement: bringing to basket...")
-        self.move_arm(0.0, -1.0, 0.0, 1.5, -2.44, 1.6)
+        self.move_arm("GROUP_1", 0.0, -1.0, 0.0, 1.5, -2.44, 1.6)
 
     # def elevator_result(self, result):
     #     self.arm_lock.acquire()
@@ -192,7 +213,7 @@ class ArmMovement:
             value = result.process_value
         else:
             value = result.current_pos
-        self.is_accomplished_elbow1 = abs(self.target_elbow1 - value) <= self.error_value
+        self.is_accomplished_elbow1 = abs(self.target_elbow1 - value) <= self.error_value * 1.5
         self.check_group2_executed()
         self.arm_lock.release()
 
@@ -202,7 +223,7 @@ class ArmMovement:
             value = result.process_value
         else:
             value = result.current_pos
-        self.is_accomplished_elbow2 = abs(self.target_elbow2 - value) <= self.error_value
+        self.is_accomplished_elbow2 = abs(self.target_elbow2 - value) <= self.error_value * 1.5
         self.check_group2_executed()
         self.arm_lock.release()
 
@@ -280,23 +301,36 @@ class ArmMovement:
         if not self.group1_executed and self.is_accomplished_base and self.is_accomplished_shoulder:
             self.shutdown_group1_subscribers()
             self.group1_executed = True
-            rospy.loginfo("Arm movement: base and shoulder are at requested position")
-            self.move_group2()
-
-    def check_group2_executed(self):
-        if not self.arm_result_sent and self.group1_executed:
-            if self.is_accomplished_elbow1 and self.is_accomplished_elbow2 and self.is_accomplished_wrist:
-                self.shutdown_group2_subscribers()
-                if self.arm_movement_command == "INIT_ARM":
-                    self.arm_movement_result_publisher.publish("ARM_INITIALIZED")
-                    rospy.loginfo("Arm movement: initialization complete")
-                elif self.arm_movement_command == "DEPLOY_ARM":
+            rospy.loginfo("Arm movement: group 1 at requested position")
+            if self.first_group_moving == 1:
+                self.move_group2()
+            else:
+                if self.arm_movement_command == "DEPLOY_ARM":
                     self.arm_movement_result_publisher.publish("ARM_DEPLOYED")
                     rospy.loginfo("Arm movement: arm deployed")
-                elif self.arm_movement_command == "BRING_TO_BASKET":
-                    self.arm_movement_result_publisher.publish("ARM_AT_BASKET")
-                    rospy.loginfo("Arm movement: arm at basket")
-                self.arm_result_sent = True
+                    self.arm_result_sent = True
+                else:
+                    rospy.logwarn("Arm movement: illegal arm state")
+
+    def check_group2_executed(self):
+        # if not self.arm_result_sent and self.group1_executed:
+            if not self.group2_executed and self.is_accomplished_elbow1 and self.is_accomplished_elbow2 and self.is_accomplished_wrist:
+                self.shutdown_group2_subscribers()
+                self.group2_executed = True
+                rospy.loginfo("Arm movement: group 2 at requested position")
+                if self.first_group_moving == 2:
+                    self.move_group1()
+                else:
+                    if self.arm_movement_command == "INIT_ARM":
+                        self.arm_movement_result_publisher.publish("ARM_INITIALIZED")
+                        rospy.loginfo("Arm movement: initialization complete")
+                        self.arm_result_sent = True
+                    elif self.arm_movement_command == "BRING_TO_BASKET":
+                        self.arm_movement_result_publisher.publish("ARM_AT_BASKET")
+                        rospy.loginfo("Arm movement: arm at basket")
+                        self.arm_result_sent = True
+                    else:
+                        rospy.logwarn("Arm movement: illegal arm state")
 
 
 if __name__ == "__main__":
