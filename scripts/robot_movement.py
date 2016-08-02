@@ -47,16 +47,6 @@ class RobotMovement:
 		roll, pitch, yaw = euler_from_quaternion([q.w, q.x, q.y, q.z])
 		return (roll * 180 / math.pi) + 180
 
-	# def stop_turning(self, cause):
-	# 	self.searching_for_ball = False
-	# 	self.movement_message = Twist()
-	# 	self.movement_publisher.publish(self.movement_message)
-	# 	self.state_machine_publisher.publish(cause)
-	# 	if cause == "BALL_FOUND":
-	# 		rospy.loginfo("Robot movement: ball is centered, wheels stopped")
-	# 	else:
-	# 		rospy.loginfo("Robot movement: no ball detected")
-
 	def stop_in_place(self, cause):
 		self.searching_for_ball = False
 		self.movement_message = Twist()
@@ -66,15 +56,15 @@ class RobotMovement:
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.2 # rad/s
+			return 0.25 # rad/s
 		else:
-			return 0.35 # rad/s
+			return 0.4 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:
-			return 0.05 # m/s
+			return 0.1 # m/s
 		else:
-			return 0.15 # m/s
+			return 0.2 # m/s
 
 	def move_robot(self, direction, lx, ly, lz, ax, ay, az):
 		self.movement_message.linear.x = lx

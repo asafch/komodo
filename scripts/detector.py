@@ -35,8 +35,8 @@ class Detector:
         self.processed_image_bw_publisher = rospy.Publisher("/pluto/processed_image_bw", Image, queue_size = 10)
         self.wheel_publisher = rospy.Publisher("pluto/robot_movement/command", String, queue_size = 10)
         # the image resolution of the front camera varies between the real camera and the simulated one
-        self.front_camera_x_reference = 1080 if self.is_simulation else 107
-        self.front_camera_y_reference = 1190 if self.is_simulation else 160
+        self.front_camera_x_reference = 1080 if self.is_simulation else 297
+        self.front_camera_y_reference = 1190 if self.is_simulation else 120
 
     def camera_change(self, command):
         self.current_camera = command.data
@@ -68,31 +68,38 @@ class Detector:
         image_cv = self.bridge.imgmsg_to_cv2(image, "bgr8")
         blurred_image = cv2.GaussianBlur(image_cv, (5, 5), 0)
 
-        (lower, upper) = ([100, 70, 40], [255, 200, 150])
+        # # (lower, upper) = ([100, 70, 40], [255, 200, 150]) # old values
+        # (lower, upper) = ([100, 70, 50], [255, 255, 255]) # new values
 
-        lower = np.array(lower, dtype = "uint8")
-        upper = np.array(upper, dtype = "uint8")
 
-        mask = cv2.inRange(blurred_image, lower, upper)
-        output = cv2.bitwise_and(blurred_image, blurred_image, mask = mask)
+        # lower = np.array(lower, dtype = "uint8")
+        # upper = np.array(upper, dtype = "uint8")
 
-        (lower, upper) = ([100, 0, 0], [255, 160, 100])
+        # mask = cv2.inRange(blurred_image, lower, upper)
+        # output = cv2.bitwise_and(blurred_image, blurred_image, mask = mask)
 
-        lower = np.array(lower, dtype = "uint8")
-        upper = np.array(upper, dtype = "uint8")
+        # # # (lower, upper) = ([100, 0, 0], [255, 160, 100]) # old values
+        # # (lower, upper) = ([100, 70, 0], [255, 255, 255]) # new values
 
-        mask = cv2.inRange(output, lower, upper)
-        output = cv2.bitwise_and(output, output, mask = mask)
 
-        bw_image = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+        # # lower = np.array(lower, dtype = "uint8")
+        # # upper = np.array(upper, dtype = "uint8")
+
+        # # mask = cv2.inRange(output, lower, upper)
+        # # output = cv2.bitwise_and(output, output, mask = mask)
+
+        # # bw_image = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+        bw_image = cv2.cvtColor(blurred_image, cv2.COLOR_BGR2GRAY)
+
         params = cv2.SimpleBlobDetector_Params()
         params.filterByInertia = False
         params.filterByConvexity = True
-        params.filterByColor = False # online sources indicate that this feature isn't working properly, hence the manual color filtration used earlier in the code
+        params.filterByColor = True # online sources indicate that this feature isn't working properly, hence the manual color filtration used earlier in the code
+        params.blobColor = 255
         params.filterByCircularity = True
         params.filterByArea = True
-        params.minArea = 200.0
-        params.maxArea = 20000.0
+        params.minArea = 300.0
+        params.maxArea = 1500.0
         params.minConvexity = 0.6
         params.maxConvexity = 1.0
         params.minCircularity = 0.2

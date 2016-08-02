@@ -310,24 +310,23 @@ class ArmMovement:
                     rospy.logwarn("Arm movement: illegal arm state, group 1")
 
     def check_group2_executed(self):
-        # if not self.arm_result_sent and self.group1_executed:
-            if not self.group2_executed and self.is_accomplished_elbow1 and self.is_accomplished_elbow2 and self.is_accomplished_wrist:
-                self.shutdown_group2_subscribers()
-                self.group2_executed = True
-                rospy.loginfo("Arm movement: group 2 at requested position")
-                if self.first_group_moving == 2:
-                    self.move_group1()
+        if not self.group2_executed and self.is_accomplished_elbow1 and self.is_accomplished_elbow2 and self.is_accomplished_wrist:
+            self.shutdown_group2_subscribers()
+            self.group2_executed = True
+            rospy.loginfo("Arm movement: group 2 at requested position")
+            if self.first_group_moving == 2:
+                self.move_group1()
+            else:
+                if self.arm_movement_command == "INIT_ARM":
+                    self.arm_movement_result_publisher.publish("ARM_INITIALIZED")
+                    rospy.loginfo("Arm movement: initialization complete")
+                    self.arm_result_sent = True
+                elif self.arm_movement_command == "BRING_TO_BASKET":
+                    self.arm_movement_result_publisher.publish("ARM_AT_BASKET")
+                    rospy.loginfo("Arm movement: arm at basket")
+                    self.arm_result_sent = True
                 else:
-                    if self.arm_movement_command == "INIT_ARM":
-                        self.arm_movement_result_publisher.publish("ARM_INITIALIZED")
-                        rospy.loginfo("Arm movement: initialization complete")
-                        self.arm_result_sent = True
-                    elif self.arm_movement_command == "BRING_TO_BASKET":
-                        self.arm_movement_result_publisher.publish("ARM_AT_BASKET")
-                        rospy.loginfo("Arm movement: arm at basket")
-                        self.arm_result_sent = True
-                    else:
-                        rospy.logwarn("Arm movement: illegal arm state, group 2")
+                    rospy.logwarn("Arm movement: illegal arm state, group 2")
 
 
 if __name__ == "__main__":
