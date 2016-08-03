@@ -28,12 +28,12 @@ class Detector:
     def __init__(self):
         init_arguments(self)
         self.state = "NO_SEARCH"
-        rospy.Subscriber("/pluto/detector/current_camera", String, self.camera_change)
-        rospy.Subscriber("/pluto/detector/state_change", String, self.state_change)
+        rospy.Subscriber("/jupiter/detector/current_camera", String, self.camera_change)
+        rospy.Subscriber("/jupiter/detector/state_change", String, self.state_change)
         self.bridge = cv_bridge.CvBridge()
-        self.processed_image_publisher = rospy.Publisher("/pluto/processed_image", Image, queue_size = 10)
-        self.processed_image_bw_publisher = rospy.Publisher("/pluto/processed_image_bw", Image, queue_size = 10)
-        self.wheel_publisher = rospy.Publisher("pluto/robot_movement/command", String, queue_size = 10)
+        self.processed_image_publisher = rospy.Publisher("/jupiter/processed_image", Image, queue_size = 10)
+        self.processed_image_bw_publisher = rospy.Publisher("/jupiter/processed_image_bw", Image, queue_size = 10)
+        self.wheel_publisher = rospy.Publisher("jupiter/robot_movement/command", String, queue_size = 10)
         # the image resolution of the front camera varies between the real camera and the simulated one
         self.front_camera_x_reference = 1080 if self.is_simulation else 297
         self.front_camera_y_reference = 1190 if self.is_simulation else 120

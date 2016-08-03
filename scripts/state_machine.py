@@ -24,12 +24,12 @@ class StateMachine:
     def __init__(self):
         rospy.loginfo("State machine: initializing")
         self.state = "INIT_ARM"
-        self.arm_movement_publisher = rospy.Publisher("/pluto/arm_movement/command", String, queue_size = 10)
-        rospy.Subscriber("/pluto/arm_movement/result", String, self.arm_movement_result)
-        self.camera_publisher = rospy.Publisher("/pluto/detector/current_camera", String, queue_size = 10)
-        self.camera_state_publisher = rospy.Publisher("/pluto/detector/state_change", String, queue_size = 10)
-        self.robot_movement_publisher = rospy.Publisher("/pluto/robot_movement/command", String, queue_size = 10)
-        rospy.Subscriber("/pluto/robot_movement/result", String, self.robot_movement_result)
+        self.arm_movement_publisher = rospy.Publisher("/jupiter/arm_movement/command", String, queue_size = 10)
+        rospy.Subscriber("/jupiter/arm_movement/result", String, self.arm_movement_result)
+        self.camera_publisher = rospy.Publisher("/jupiter/detector/current_camera", String, queue_size = 10)
+        self.camera_state_publisher = rospy.Publisher("/jupiter/detector/state_change", String, queue_size = 10)
+        self.robot_movement_publisher = rospy.Publisher("/jupiter/robot_movement/command", String, queue_size = 10)
+        rospy.Subscriber("/jupiter/robot_movement/result", String, self.robot_movement_result)
         time.sleep(20) # allow moveArm.py to load before sending the first arm initialization command, this is needed when simulating in order to allow gazebo to fully load
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")

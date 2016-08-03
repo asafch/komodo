@@ -54,8 +54,8 @@ class ArmMovement:
         else:
             self.jointType = dxl_JointState
         #arm publisher and suscriber
-        rospy.Subscriber("/pluto/arm_movement/command", String, self.process_command)
-        self.arm_movement_result_publisher = rospy.Publisher("/pluto/arm_movement/result", String, queue_size = 10)
+        rospy.Subscriber("/jupiter/arm_movement/command", String, self.process_command)
+        self.arm_movement_result_publisher = rospy.Publisher("/jupiter/arm_movement/result", String, queue_size = 10)
         #joint command publishers
         # self.elevator_publisher   = rospy.Publisher(adjust_namespace(self.is_simulation, "/elevator_controller/command"), Float64, queue_size = 10)
         self.base_publisher       = rospy.Publisher(adjust_namespace(self.is_simulation, "/base_rotation_controller/command"), Float64, queue_size = 10)
