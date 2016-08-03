@@ -26,7 +26,6 @@ class RobotMovement:
 	def __init__(self):
 		init_arguments(self)
 		self.movement_subscriber = rospy.Subscriber("/jupiter/robot_movement/command", String, self.process_command)
-		self.movement_publisher = rospy.Publisher(adjust_namespace(self.is_simulation, "/diff_driver/command"), Twist, queue_size = 10)
 		self.state_machine_publisher = rospy.Publisher("/jupiter/robot_movement/result", String, queue_size = 10)
 		self.odometry_subscriber = rospy.Subscriber(adjust_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
 		self.movement_message = Twist()
@@ -49,8 +48,7 @@ class RobotMovement:
 
 	def stop_in_place(self, cause):
 		self.searching_for_ball = False
-		self.movement_message = Twist()
-		self.movement_publisher.publish(self.movement_message)
+		self.move_robot("STOP", 0, 0, 0, 0, 0, 0)
 		self.state_machine_publisher.publish(cause)
 		rospy.loginfo("Robot movement: stop in place, cause: %s", cause)
 
@@ -67,13 +65,14 @@ class RobotMovement:
 			return 0.2 # m/s
 
 	def move_robot(self, direction, lx, ly, lz, ax, ay, az):
+		self.movement_publisher = rospy.Publisher("/komodo_1/komodo_1/diff_driver/command", Twist, queue_size = 10)
 		self.movement_message.linear.x = lx
 		self.movement_message.linear.y = ly
 		self.movement_message.linear.z = lz
 		self.movement_message.angular.x = ax
 		self.movement_message.angular.y = ay
 		self.movement_message.angular.z = az
-		rospy.loginfo("Robot movement: move %s", direction)
+		rospy.loginfo("Robot movement: move %s, movement_message:\n%r", direction, self.movement_message)
 		self.movement_publisher.publish(self.movement_message)
 
 	def process_command(self, command):

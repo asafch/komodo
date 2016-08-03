@@ -22,6 +22,7 @@ class StateMachine:
     release_ball_message_sent = False 
     
     def __init__(self):
+        init_arguments(self)
         rospy.loginfo("State machine: initializing")
         self.state = "INIT_ARM"
         self.arm_movement_publisher = rospy.Publisher("/jupiter/arm_movement/command", String, queue_size = 10)
@@ -30,7 +31,7 @@ class StateMachine:
         self.camera_state_publisher = rospy.Publisher("/jupiter/detector/state_change", String, queue_size = 10)
         self.robot_movement_publisher = rospy.Publisher("/jupiter/robot_movement/command", String, queue_size = 10)
         rospy.Subscriber("/jupiter/robot_movement/result", String, self.robot_movement_result)
-        time.sleep(20) # allow moveArm.py to load before sending the first arm initialization command, this is needed when simulating in order to allow gazebo to fully load
+        time.sleep(20 if self.is_simulation else 10) # allow moveArm.py to load before sending the first arm initialization command, this is needed when simulating in order to allow gazebo to fully load
         rospy.loginfo("State machine: initialized")
         rospy.loginfo("State machine: state is INIT_ARM")
 
