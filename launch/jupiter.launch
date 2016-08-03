@@ -1,14 +1,12 @@
 <!-- -*- mode: XML -*- -->
 <launch>
-    <group ns="komodo_1">
-		<include file="$(find ric_board)/launch/komodo_bgu.launch"/>
-    </group>
 
-  <node name="arm_movement" pkg="jupiter" type="arm_movement.py"  output="screen" args="" respawn="true" /> 
-  <node name="robot_movement" pkg="jupiter" type="robot_movement.py" output="screen" args="" respawn="true" />
-  <node name="detector" pkg="jupiter" type="detector.py" output="screen" args="" respawn="true" />
-  <node name="state_machine"   pkg="jupiter" type="state_machine.py"  output="screen" args="" respawn="false" />
+	<include file="$(find ric_board)/launch/komodo_bgu.launch"/>
+
+	<node name="arm_movement" pkg="jupiter" type="arm_movement.py"  output="screen" args="" respawn="true" /> 
+	<node name="robot_movement" pkg="jupiter" type="robot_movement.py" output="screen" args="" respawn="true" />
+	<node name="detector" pkg="jupiter" type="detector.py" output="screen" args="" respawn="true" />
+	<node name="state_machine"   pkg="jupiter" type="state_machine.py"  output="screen" args="" respawn="false" />
   
-	
 </launch>
 

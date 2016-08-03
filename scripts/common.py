@@ -12,4 +12,4 @@ def adjust_namespace(is_simulation, topic):
     if is_simulation:
         return topic
     else:
-        return "/komodo_1/komodo_1" + topic
+        return "/komodo_1" + topic
