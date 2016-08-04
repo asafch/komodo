@@ -8,12 +8,27 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import String
 from common import *
 from tf.transformations import euler_from_quaternion
+from threading import Lock
+import thread
+
+def message_republisher(name, self):
+	while True:
+		if self.movement_command != "":
+			if self.movement_command == "RIGHT":
+				self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
+			elif self.movement_command == "LEFT":
+				self.move_robot("LEFT", 0, 0, 0, 0, 0, self.get_anguler_speed())
+			elif self.movement_command == "FORWARD":
+				self.move_robot("FORWARD", self.get_linear_speed(), 0, 0, 0, 0, 0)
+			elif self.movement_command == "BACKWARD":
+				self.move_robot("BACKWARD", -self.get_linear_speed(), 0, 0, 0, 0, 0)
+			self.movement_publisher.publish(self.movement_message)
 
 class RobotMovement:
-
 	movement_subscriber = None
 	movement_publisher = None
 	movement_message = None
+	movement_command = ""
 	state_machine_publisher = None
 	fine_movement = False
 	odometry_subscriber = None
@@ -22,24 +37,33 @@ class RobotMovement:
 	searching_for_ball = False
 	prepared_to_stop = False
 	angular_offset = 0.75
+	odometry_lock = None
 
 	def __init__(self):
 		init_arguments(self)
+		self.movement_publisher = rospy.Publisher(adjust_namespace(self.is_simulation, "/diff_driver/command"), Twist, queue_size = 100)
 		self.movement_subscriber = rospy.Subscriber("/jupiter/robot_movement/command", String, self.process_command)
 		self.state_machine_publisher = rospy.Publisher("/jupiter/robot_movement/result", String, queue_size = 10)
 		self.odometry_subscriber = rospy.Subscriber(adjust_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
 		self.movement_message = Twist()
+		self.odometry_lock = Lock()
+		thread.start_new_thread(message_republisher, ("movement_message_republisher", self))
 
 	def odometry_updated(self, message):
+		self.odometry_lock.acquire()
 		if self.update_reference_odometry:
 			self.last_orientation = self.odometry_get_angle(message)
 			self.update_reference_odometry = False
-			time.sleep(3)
+			time.sleep(6)
 		elif self.searching_for_ball:
-			if abs(self.last_orientation - self.odometry_get_angle(message)) >= self.angular_offset * 2:
+			if abs(self.last_orientation - self.odometry_get_angle(message)) >= 5 and not self.fine_movement:
+				self.fine_movement = True # The wheels overcame the friction from the floor. Reduce the turn rate to improve CV functionality.
+				rospy.loginfo("Robot movement: fine movement")
+			if abs(self.last_orientation - self.odometry_get_angle(message)) >= self.angular_offset * 2 and not self.prepared_to_stop:
 				self.prepared_to_stop = True
 			elif self.prepared_to_stop and abs(self.last_orientation - self.odometry_get_angle(message)) <= self.angular_offset:
 				self.stop_in_place("NO_BALL")
+		self.odometry_lock.release()
 
 	def odometry_get_angle(self, message):
 		q = message.pose.pose.orientation
@@ -54,34 +78,33 @@ class RobotMovement:
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.25 # rad/s
+			return 0.05 # rad/s
 		else:
-			return 0.4 # rad/s
+			return 0.2 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:
-			return 0.1 # m/s
+			return 0.05 # m/s
 		else:
-			return 0.2 # m/s
+			return 0.05 # m/s
 
 	def move_robot(self, direction, lx, ly, lz, ax, ay, az):
-		self.movement_publisher = rospy.Publisher("/komodo_1/komodo_1/diff_driver/command", Twist, queue_size = 10)
 		self.movement_message.linear.x = lx
 		self.movement_message.linear.y = ly
 		self.movement_message.linear.z = lz
 		self.movement_message.angular.x = ax
 		self.movement_message.angular.y = ay
 		self.movement_message.angular.z = az
-		rospy.loginfo("Robot movement: move %s, movement_message:\n%r", direction, self.movement_message)
-		self.movement_publisher.publish(self.movement_message)
+		self.movement_command = direction
 
 	def process_command(self, command):
+		self.odometry_lock.acquire()
 		if command.data == "SEARCH_BALL":
-			rospy.loginfo("Robot movement: searching for ball")
-			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 			self.update_reference_odometry = True
 			self.searching_for_ball = True
+			self.prepared_to_stop = False
 			self.fine_movement = False
+			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 		elif command.data == "STOP-BALL_FOUND":
 			self.stop_in_place("BALL_FOUND")
 		elif command.data == "STOP-BALL_AT_BOTTOM_OF_FRAME":
@@ -89,6 +112,7 @@ class RobotMovement:
 			self.fine_movement = True
 		elif command.data == "STOP-BALL_AT_POSITION":
 			self.stop_in_place("BALL_AT_POSITION")
+			self.searching_for_ball = False
 		elif command.data == "LEFT":
 			self.move_robot(command.data, 0, 0, 0, 0, 0, self.get_anguler_speed())
 		elif command.data == "RIGHT":
@@ -97,6 +121,8 @@ class RobotMovement:
 			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
 		else: # BACKWARD
 			self.move_robot(command.data, -self.get_linear_speed(), 0, 0, 0, 0, 0)
+		rospy.loginfo("Robot movement: move %s", self.movement_command)
+		self.odometry_lock.release()
 
 if __name__ == "__main__":
 	rospy.init_node("robot_movement")

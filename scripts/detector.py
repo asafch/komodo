@@ -15,7 +15,7 @@ class Detector:
     bridge = None
     processed_image_publisher = None
     processed_image_bw_publisher = None
-    offset = 20
+    offset = 100
     wheel_publisher = None
     state = ""
     ball_at_middle_Y_of_Asus_Camera = False
@@ -47,7 +47,7 @@ class Detector:
             self.ball_at_middle_Y_of_Asus_Camera = False
             self.ball_at_bottom_message_sent = False
             self.ball_positioned = False
-            self.offset = 20
+            self.offset = 100
             self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Asus_Camera/rgb/image_raw"), Image, self.process_image)
         # elif self.current_camera == "CREATIVE_CAMERA":
         #     self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Creative_Camera/rgb/image_raw" if self.is_simulation else "/arm_cam_node/image_raw"), Image, self.process_image)
@@ -150,23 +150,23 @@ class Detector:
             self.ball_at_bottom_message_sent = True
             self.wheel_publisher.publish("STOP-BALL_AT_BOTTOM_OF_FRAME")
             rospy.loginfo("Detector: ball is at bottom of Asus Camera frame")
-        # elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
-        #     if target[1] - 1190 > 0:
-        #         self.wheel_publisher.publish("BACKWARD")
-        #     else:
-        #         self.wheel_publisher.publish("FORWARD")
-        # elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
-        #     self.ball_at_proper_Y_of_Front_Camera = True
-        #     self.wheel_publisher.publish("STOP-BALL_FOUND")
-        # elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera:
-        #     if target[0] - 1080 > 0:
-        #         self.wheel_publisher.publish("RIGHT")
-        #     else:
-        #         self.wheel_publisher.publish("LEFT")
-        # elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and not self.ball_positioned:
-        #     self.ball_at_proper_X_of_Front_Camera = True
-        #     self.ball_positioned = True
-        #     self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+            if target[1] - 1190 > 0:
+                self.wheel_publisher.publish("BACKWARD")
+            else:
+                self.wheel_publisher.publish("FORWARD")
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+            self.ball_at_proper_Y_of_Front_Camera = True
+            self.wheel_publisher.publish("STOP-BALL_FOUND")
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera:
+            if target[0] - 1080 > 0:
+                self.wheel_publisher.publish("RIGHT")
+            else:
+                self.wheel_publisher.publish("LEFT")
+        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and not self.ball_positioned:
+            self.ball_at_proper_X_of_Front_Camera = True
+            self.ball_positioned = True
+            self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
 
 if __name__ == "__main__":
     rospy.init_node("detector")
