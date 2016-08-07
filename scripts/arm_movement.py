@@ -148,8 +148,8 @@ class ArmMovement:
             self.target_rfinger = 0.2
         elif position == "CLOSE_FINGERS":
             rospy.loginfo("Arm movement: closing fingers")
-            self.target_lfinger = 0
-            self.target_rfinger = 0
+            self.target_lfinger = 0.05
+            self.target_rfinger = -0.05
         self.is_accomplished_lfinger = False
         self.is_accomplished_rfinger = False
         self.lfinger_publisher.publish(self.target_lfinger)

@@ -4,6 +4,7 @@ import rospy
 import cv2
 import numpy as np
 import cv_bridge
+import time
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from common import *
@@ -24,6 +25,7 @@ class Detector:
     ball_positioned = False
     front_camera_x_reference = 0
     front_camera_y_reference = 0
+    previous_state = 0
 
     def __init__(self):
         init_arguments(self)
@@ -48,6 +50,7 @@ class Detector:
             self.ball_at_bottom_message_sent = False
             self.ball_positioned = False
             self.offset = 100
+            self.previous_state = 0
             self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Asus_Camera/rgb/image_raw"), Image, self.process_image)
         # elif self.current_camera == "CREATIVE_CAMERA":
         #     self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Creative_Camera/rgb/image_raw" if self.is_simulation else "/arm_cam_node/image_raw"), Image, self.process_image)
@@ -120,53 +123,75 @@ class Detector:
             y = keypoint.pt[1]
             r = keypoint.size / 2.0
             circles.append([x, y, r])
-        target = [0, 0, 0]
-        max_circle = None
+        target = None
         if circles:
             circles     = np.uint16(np.around(circles))
             max_r       = 0.0
-            max_circle  = circles[0] 
+            target  = circles[0] 
             for circle in circles:
-                if circle[2] > max_r and circle[1] >= ((image.height / 5) * 4 if self.current_camera == "ASUS_CAMERA" else (image.height / 2)):
+                if circle[2] > max_r and circle[1] >= ((image.height / 5) * 4 if self.current_camera == "ASUS_CAMERA" else (image.height / 3)):
                     max_r       = circle[2]
-                    max_circle  = circle
-            target = max_circle
-        processed_image_bw = cv2.drawKeypoints(image_binary, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        center = (target[0], target[1])
-        cv2.circle(processed_image_bw, center, target[2], (255, 0, 0), 1, 8, 0)
-        processed_image = cv2.drawKeypoints(image_cv, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        cv2.circle(processed_image, center, target[2], (255, 0, 0), 1, 8, 0)
-        # publish the keypoints and target circle superimposed on the source image from the camera and on the b&w image
-        self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image, "bgr8"))
-        self.processed_image_bw_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image_bw, "bgr8"))
-        # if target[2]:
-        #     rospy.loginfo("x: %d, y: %d, radius: %d", target[0], target[1], target[2])
-        #     rospy.loginfo("w:%d h:%d", image.width, image.height)
-        if max_circle != None and self.current_camera == "ASUS_CAMERA" and abs(target[0] - (image.width / 2)) < self.offset and not self.ball_at_middle_Y_of_Asus_Camera:
-            self.ball_at_middle_Y_of_Asus_Camera = True
-            self.wheel_publisher.publish("STOP-BALL_FOUND")
-            rospy.loginfo("Detector: ball found")
-        elif max_circle != None and self.current_camera == "ASUS_CAMERA" and abs(target[1] - (image.height)) < (image.height / 15.0) and self.ball_at_middle_Y_of_Asus_Camera and not self.ball_at_bottom_message_sent:
-            self.ball_at_bottom_message_sent = True
-            self.wheel_publisher.publish("STOP-BALL_AT_BOTTOM_OF_FRAME")
-            rospy.loginfo("Detector: ball is at bottom of Asus Camera frame")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
-            if target[1] - 1190 > 0:
-                self.wheel_publisher.publish("BACKWARD")
-            else:
-                self.wheel_publisher.publish("FORWARD")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
-            self.ball_at_proper_Y_of_Front_Camera = True
-            self.wheel_publisher.publish("STOP-BALL_FOUND")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera:
-            if target[0] - 1080 > 0:
-                self.wheel_publisher.publish("RIGHT")
-            else:
-                self.wheel_publisher.publish("LEFT")
-        elif max_circle != None and self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and not self.ball_positioned:
-            self.ball_at_proper_X_of_Front_Camera = True
-            self.ball_positioned = True
-            self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
+                    target  = circle
+        if target != None:
+            processed_image_bw = cv2.drawKeypoints(image_binary, keypoints, np.array([]), (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            center = (target[0], target[1])
+            cv2.circle(processed_image_bw, center, target[2], (255, 0, 0), 1, 8, 0)
+            processed_image = cv2.drawKeypoints(image_cv, keypoints, np.array([]), (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            cv2.circle(processed_image, center, target[2], (255, 0, 0), 1, 8, 0)
+            # publish the keypoints and target circle superimposed on the source image from the camera and on the b&w image
+            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image, "bgr8"))
+            self.processed_image_bw_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image_bw, "bgr8"))
+            # if target[2]:
+            #     rospy.loginfo("x: %d, y: %d, radius: %d", target[0], target[1], target[2])
+            #     rospy.loginfo("w:%d h:%d", image.width, image.height)
+
+            if self.current_camera == "ASUS_CAMERA" and self.asus_ballpark(target[0], image) and self.previous_state != 1:
+                self.previous_state = 1
+                self.ball_at_middle_Y_of_Asus_Camera = True
+                self.wheel_publisher.publish("STOP-BALL_FOUND")
+                rospy.loginfo("Detector: ball found")
+            # if target != None and self.current_camera == "ASUS_CAMERA" and abs(target[0] - (image.width / 2)) < self.offset and not self.ball_at_middle_Y_of_Asus_Camera:
+            #     self.ball_at_middle_Y_of_Asus_Camera = True
+            #     self.wheel_publisher.publish("STOP-BALL_FOUND")
+            #     rospy.loginfo("Detector: ball found")
+            # elif target != None and self.current_camera == "ASUS_CAMERA" and abs(target[1] - (image.height)) < (image.height / 10.0) and self.ball_at_middle_Y_of_Asus_Camera and not self.ball_at_bottom_message_sent:
+            #     self.ball_at_bottom_message_sent = True
+            #     self.wheel_publisher.publish("STOP-BALL_AT_BOTTOM_OF_FRAME")
+            #     rospy.loginfo("Detector: ball is at bottom of Asus Camera frame")
+            # elif target != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+            #     if target[1] - self.front_camera_y_reference > 0:
+            #         self.wheel_publisher.publish("BACKWARD")
+            #     else:
+            #         self.wheel_publisher.publish("FORWARD")
+            # elif target != None and self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera:
+            #     self.ball_at_proper_Y_of_Front_Camera = True
+            #     self.wheel_publisher.publish("STOP-BALL_FOUND")
+            elif self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera and self.previous_state != 2:
+                if target[0] - self.front_camera_x_reference > 0:
+                    self.wheel_publisher.publish("RIGHT")
+                else:
+                    self.wheel_publisher.publish("LEFT")
+            elif self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and self.previous_state != 2:
+                self.previous_state = 2
+                self.ball_at_proper_X_of_Front_Camera = True
+                self.wheel_publisher.publish("STOP-BALL_FOUND")
+                # self.ball_positioned = True
+                # self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
+            elif self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera and target[2] <= 8 and self.previous_state != 3:
+                if target[1] - self.front_camera_y_reference > 0:
+                    self.wheel_publisher.publish("BACKWARD")
+                else:
+                    self.wheel_publisher.publish("FORWARD")
+            elif self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera and not self.ball_positioned and self.previous_state != 3:
+                self.previous_state = 3
+                self.ball_at_proper_Y_of_Front_Camera = True
+                # self.wheel_publisher.publish("STOP-BALL_FOUND")
+                self.ball_positioned = True
+                self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
+                rospy.loginfo("TARGET: %r", target)
+
+    def asus_ballpark(self, x, image):
+        return x <= (image.width * 0.85) and x >= (image.width * 0.75)
 
 if __name__ == "__main__":
     rospy.init_node("detector")

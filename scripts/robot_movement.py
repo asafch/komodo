@@ -11,19 +11,6 @@ from tf.transformations import euler_from_quaternion
 from threading import Lock
 import thread
 
-def message_republisher(name, self):
-	while True:
-		if self.movement_command != "":
-			if self.movement_command == "RIGHT":
-				self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
-			elif self.movement_command == "LEFT":
-				self.move_robot("LEFT", 0, 0, 0, 0, 0, self.get_anguler_speed())
-			elif self.movement_command == "FORWARD":
-				self.move_robot("FORWARD", self.get_linear_speed(), 0, 0, 0, 0, 0)
-			elif self.movement_command == "BACKWARD":
-				self.move_robot("BACKWARD", -self.get_linear_speed(), 0, 0, 0, 0, 0)
-			self.movement_publisher.publish(self.movement_message)
-
 class RobotMovement:
 	movement_subscriber = None
 	movement_publisher = None
@@ -47,8 +34,9 @@ class RobotMovement:
 		self.odometry_subscriber = rospy.Subscriber(adjust_namespace(self.is_simulation, "/diff_driver/odometry"), Odometry, self.odometry_updated)
 		self.movement_message = Twist()
 		self.odometry_lock = Lock()
-		thread.start_new_thread(message_republisher, ("movement_message_republisher", self))
 
+	# Odometry messages are  at a rate of ~50Hz, so publish a movement message for each odometry message received.
+	# This is vital when dealing with the real robot, since it requires a constant stream of movement messages in order to not ignore them.
 	def odometry_updated(self, message):
 		self.odometry_lock.acquire()
 		if self.update_reference_odometry:
@@ -64,11 +52,25 @@ class RobotMovement:
 			elif self.prepared_to_stop and abs(self.last_orientation - self.odometry_get_angle(message)) <= self.angular_offset:
 				self.stop_in_place("NO_BALL")
 		self.odometry_lock.release()
+		self.message_republisher()
+
 
 	def odometry_get_angle(self, message):
 		q = message.pose.pose.orientation
 		roll, pitch, yaw = euler_from_quaternion([q.w, q.x, q.y, q.z])
 		return (roll * 180 / math.pi) + 180
+
+	def message_republisher(self):
+		if self.movement_command != "":
+			if self.movement_command == "RIGHT":
+				self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
+			elif self.movement_command == "LEFT":
+				self.move_robot("LEFT", 0, 0, 0, 0, 0, self.get_anguler_speed())
+			elif self.movement_command == "FORWARD":
+				self.move_robot("FORWARD", self.get_linear_speed(), 0, 0, 0, 0, 0)
+			elif self.movement_command == "BACKWARD":
+				self.move_robot("BACKWARD", -self.get_linear_speed(), 0, 0, 0, 0, 0)
+			self.movement_publisher.publish(self.movement_message)
 
 	def stop_in_place(self, cause):
 		self.searching_for_ball = False
@@ -78,13 +80,13 @@ class RobotMovement:
 
 	def get_anguler_speed(self):
 		if self.fine_movement:
-			return 0.05 # rad/s
+			return 0.08 # rad/s
 		else:
 			return 0.2 # rad/s
 
 	def get_linear_speed(self):
 		if self.fine_movement:
-			return 0.05 # m/s
+			return 0.03 # m/s
 		else:
 			return 0.05 # m/s
 

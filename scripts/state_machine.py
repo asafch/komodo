@@ -60,7 +60,8 @@ class StateMachine:
 
     def robot_movement_result(self, command):
         if command.data == "BALL_FOUND" and self.state == "SEARCH_BALL":
-            self.state = "ADVANCE"
+            # self.state = "ADVANCE"
+            self.state = "CENTER_THE_BALL"
         elif command.data == "NO_BALL":
             self.state = "END"
         elif command.data == "BALL_AT_BOTTOM_OF_FRAME":
