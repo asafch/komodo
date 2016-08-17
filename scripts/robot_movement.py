@@ -112,8 +112,8 @@ class RobotMovement:
 		elif command.data == "STOP-BALL_AT_BOTTOM_OF_FRAME":
 			self.stop_in_place("BALL_AT_BOTTOM_OF_FRAME")
 			self.fine_movement = True
-		elif command.data == "STOP-BALL_AT_POSITION":
-			self.stop_in_place("BALL_AT_POSITION")
+		elif command.data == "STOP-READY_TO_GRAB":
+			self.stop_in_place("READY_TO_GRAB")
 			self.searching_for_ball = False
 		elif command.data == "LEFT":
 			self.move_robot(command.data, 0, 0, 0, 0, 0, self.get_anguler_speed())
@@ -121,6 +121,10 @@ class RobotMovement:
 			self.move_robot(command.data, 0, 0, 0, 0, 0, -self.get_anguler_speed())
 		elif command.data == "FORWARD":
 			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
+		elif command.data == "FORWARD-LEFT":
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, self.get_anguler_speed())
+		elif command.data == "FORWARD-RIGHT":
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, -self.get_anguler_speed())
 		else: # BACKWARD
 			self.move_robot(command.data, -self.get_linear_speed(), 0, 0, 0, 0, 0)
 		rospy.loginfo("Robot movement: move %s", self.movement_command)

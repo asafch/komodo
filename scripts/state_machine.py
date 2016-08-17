@@ -17,9 +17,11 @@ class StateMachine:
     front_camera_message_sent = False
     deploy_arm_message_sent = False
     search_ball_message_sent = False
-    grab_message_sent = False
-    bring_to_basket_message_sent = False
-    release_ball_message_sent = False 
+    # grab_message_sent = False
+    # bring_to_basket_message_sent = False
+    # release_ball_message_sent = False 
+    deploy_arm_message_sent = False
+    arm_scan_message_sent = False
     
     def __init__(self):
         init_arguments(self)
@@ -40,16 +42,19 @@ class StateMachine:
         self.front_camera_message_sent = False
         self.deploy_arm_message_sent = False
         self.search_ball_message_sent = False
-        self.grab_message_sent = False
-        self.bring_to_basket_message_sent = False
-        self.release_ball_message_sent = False 
+        # self.grab_message_sent = False
+        # self.bring_to_basket_message_sent = False
+        # self.release_ball_message_sent = False 
         self.arm_init_message_sent = False
+        self.deploy_arm_message_sent = False
+        self.arm_scan_message_sent = False
         
     def arm_movement_result(self, command):
         if command.data == "ARM_INITIALIZED":
             self.state = "SEARCH_BALL"
         elif command.data == "ARM_DEPLOYED":
-            self.state = "GRAB"
+            # self.state = "GRAB"
+            self.state = "ARM_SCAN"
         elif command.data == "BALL_GRABBED":
             self.state = "BRING_TO_BASKET"
         elif command.data == "ARM_AT_BASKET":
@@ -60,14 +65,17 @@ class StateMachine:
 
     def robot_movement_result(self, command):
         if command.data == "BALL_FOUND" and self.state == "SEARCH_BALL":
-            # self.state = "ADVANCE"
-            self.state = "CENTER_THE_BALL"
+            self.state = "ADVANCE"
+            # self.state = "CENTER_THE_BALL"
         elif command.data == "NO_BALL":
             self.state = "END"
         elif command.data == "BALL_AT_BOTTOM_OF_FRAME":
-            self.state = "CENTER_THE_BALL"
-        elif command.data == "BALL_AT_POSITION":
-            self.state = "DEPLOY_ARM"
+            # self.state = "CENTER_THE_BALL"
+            self.state = "DEPLOY_ARM" #####################################################
+        # elif command.data == "BALL_AT_POSITION":
+        #     self.state = "DEPLOY_ARM"
+        elif command.data == "READY_TO_GRAB":
+            pass
 
 
     def main_loop(self):
@@ -92,21 +100,25 @@ class StateMachine:
                 self.camera_state_publisher.publish("SEARCH")
                 self.camera_publisher.publish("ASUS_CAMERA")
                 rospy.loginfo("State machine: state changed to SEARCH_BALL")
-            elif self.state == "CENTER_THE_BALL" and not self.front_camera_message_sent:
-                self.front_camera_message_sent = True
-                rospy.loginfo("State machine: state changed to CENTER_THE_BALL")
-                self.camera_publisher.publish("FRONT_CAMERA")
+            # elif self.state == "CENTER_THE_BALL" and not self.front_camera_message_sent:
+            #     self.front_camera_message_sent = True
+            #     rospy.loginfo("State machine: state changed to CENTER_THE_BALL")
+            #     self.camera_publisher.publish("FRONT_CAMERA")
             elif self.state == "DEPLOY_ARM" and not self.deploy_arm_message_sent:
                 self.deploy_arm_message_sent = True
                 rospy.loginfo("State machine: state changed to DEPLOY_ARM")
                 self.arm_movement_publisher.publish("DEPLOY_ARM")
                 self.camera_state_publisher.publish("NO_SEARCH")
-            elif self.state == "GRAB" and not self.grab_message_sent:
-                self.grab_message_sent = True
-                rospy.loginfo("State machine: state changed to GRAB")
-                # self.camera_publisher.publish("CREATIVE_CAMERA")
-                # self.camera_state_publisher.publish("SEARCH")
-                self.arm_movement_publisher.publish("GRAB")
+            elif self.state == "ARM_SCAN" and not self.arm_scan_message_sent:
+                self.arm_scan_message_sent = True
+                self.camera_publisher.publish("ARM_CAMERA")
+                self.camera_state_publisher.publish("SEARCH")
+            # elif self.state == "GRAB" and not self.grab_message_sent:
+            #     self.grab_message_sent = True
+            #     rospy.loginfo("State machine: state changed to GRAB")
+            #     # self.camera_publisher.publish("CREATIVE_CAMERA")
+            #     # self.camera_state_publisher.publish("SEARCH")
+            #     self.arm_movement_publisher.publish("GRAB")
             elif self.state == "BRING_TO_BASKET" and not self.bring_to_basket_message_sent:
                 self.bring_to_basket_message_sent = True
                 rospy.loginfo("State machine: state changed to BRING_TO_BASKET")

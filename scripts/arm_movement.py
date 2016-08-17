@@ -4,8 +4,10 @@ import copy
 import rospy
 import geometry_msgs.msg
 import time
+import numpy as np
 from threading import Lock
 from std_msgs.msg import String, Float64
+from jupiter.msg import BallPosition
 from common import *
 from control_msgs.msg import JointControllerState
 from dynamixel_msgs.msg import JointState as dxl_JointState
@@ -45,6 +47,9 @@ class ArmMovement:
     first_group_moving = 0
     group1_executed = False
     group2_executed = False
+    current_joint = ""
+    ball_proper_x = False
+    pixels_error = 10
 
     def __init__(self):
         rospy.loginfo("Arm movement: initializing")
@@ -55,7 +60,9 @@ class ArmMovement:
             self.jointType = dxl_JointState
         #arm publisher and suscriber
         rospy.Subscriber("/jupiter/arm_movement/command", String, self.process_command)
+        rospy.Subscriber("/jupiter/ball_position", BallPosition, self.process_ball_position)
         self.arm_movement_result_publisher = rospy.Publisher("/jupiter/arm_movement/result", String, queue_size = 10)
+        self.camera_state_publisher = rospy.Publisher("/jupiter/detector/state_change", String, queue_size = 10)
         #joint command publishers
         # self.elevator_publisher   = rospy.Publisher(adjust_namespace(self.is_simulation, "/elevator_controller/command"), Float64, queue_size = 10)
         self.base_publisher       = rospy.Publisher(adjust_namespace(self.is_simulation, "/base_rotation_controller/command"), Float64, queue_size = 10)
@@ -76,16 +83,12 @@ class ArmMovement:
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
             self.first_group_moving = 1
-            self.group1_executed = False
-            self.group2_executed = False
         elif command.data == "DEPLOY_ARM":
             self.deploy_arm()
             self.arm_result_sent = False
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
             self.first_group_moving = 2
-            self.group1_executed = False
-            self.group2_executed = False
         elif command.data == "GRAB":
             self.fingers_movement_command = "CLOSE_FINGERS"
             self.close_fingers()
@@ -95,15 +98,34 @@ class ArmMovement:
             self.arm_movement_command = command.data
             self.initialize_arm_subscribers()
             self.first_group_moving = 1
-            self.group1_executed = False
-            self.group2_executed = False
         elif command.data == "RELEASE_BALL":
             self.fingers_movement_command = "RELEASE_BALL"
             self.open_fingers()
-                    
+
+    def process_ball_position(self, message):
+        rospy.loginfo("Arm movement: ball pos msg\n%r", message)
+        if message.detected:
+            self.arm_movement_command = "BRINGING_TO_BALL"
+            x_offset = message.x - message.img_width / 2
+            y_offset = message.y - message.img_height / 2
+            if abs(x_offset) > self.pixels_error: # arm isn't centered with respect to the ball
+                self.move_arm("GROUP_1", 0.0, self.target_base + np.sign(x_offset) * 0.01, self.target_shoulder, self.target_elbow1, self.target_elbow2, self.target_wrist)
+            elif self.current_joint == "SHOULDER":
+                self.current_joint = "ELBOW2"
+                self.move_arm("GROUP_1", 0.0, self.target_base, min(1.3, self.target_shoulder + 0.05), self.target_elbow1, self.target_elbow2, self.target_wrist)
+                rospy.loginfo("moved shoulder")
+            else: # "ELBOW2"
+                self.current_joint = "SHOULDER"
+                self.target_elbow2 = max(1.3, self.target_elbow2 - 0.1)
+                self.move_arm("GROUP_1", 0.0, self.target_base, self.target_shoulder, self.target_elbow1,  self.target_elbow2, self.target_wrist)
+                rospy.loginfo("moved elbow2")
+        else:
+            self.camera_state_publisher.publish("SEARCH")
+
     def move_arm(self, first_group, elevator, base, shoulder, elbow1, elbow2, wrist):
         self.arm_lock.acquire()
         self.group1_executed = False
+        self.group2_executed = False
         # self.is_accomplished_elevator    = False
         self.is_accomplished_base        = False
         self.is_accomplished_shoulder    = False
@@ -169,7 +191,7 @@ class ArmMovement:
 
     def deploy_arm(self):
         rospy.loginfo("Arm movement: deploying arm...")
-        self.move_arm("GROUP_2", 0.0, 0.0, 1.5, 0.0, 1.0, 0.0)
+        self.move_arm("GROUP_2", 0.0, 0.0, 0.0, 0.0, 2.0, 0.0)
 
     def bring_to_basket(self):
         rospy.loginfo("Arm movement: bringing to basket...")
@@ -198,7 +220,7 @@ class ArmMovement:
             value = result.process_value
         else:
             value = result.current_pos
-        self.is_accomplished_shoulder = abs(self.target_shoulder - value) <= self.error_value * 4
+        self.is_accomplished_shoulder = abs(self.target_shoulder - value) <= self.error_value * 3
         # if self.is_accomplished_shoulder and self.is_accomplished_base:
         #     self.await_base_and_shoulder_in_position.release()
         self.check_group1_executed()
@@ -210,7 +232,7 @@ class ArmMovement:
             value = result.process_value
         else:
             value = result.current_pos
-        self.is_accomplished_elbow1 = abs(self.target_elbow1 - value) <= self.error_value * 1.5
+        self.is_accomplished_elbow1 = abs(self.target_elbow1 - value) <= self.error_value * 2
         self.check_group2_executed()
         self.arm_lock.release()
 
@@ -220,7 +242,7 @@ class ArmMovement:
             value = result.process_value
         else:
             value = result.current_pos
-        self.is_accomplished_elbow2 = abs(self.target_elbow2 - value) <= self.error_value * 1.5
+        self.is_accomplished_elbow2 = abs(self.target_elbow2 - value) <= self.error_value * 2
         self.check_group2_executed()
         self.arm_lock.release()
 
@@ -290,7 +312,7 @@ class ArmMovement:
                 elif self.fingers_movement_command == "RELEASE_BALL":
                     rospy.loginfo("Arm movement: ball released")
                     self.arm_movement_result_publisher.publish("BALL_RELEASED")
-                    self.arm_movement_command = "OPEN_FINGERS"
+                    # self.arm_movement_command = "OPEN_FINGERS"
                 rospy.loginfo("Arm movement: fingers are %s", self.fingers_movement_command)
                 self.fingers_result_sent = True
 
@@ -303,9 +325,11 @@ class ArmMovement:
                 self.move_group2()
             else:
                 if self.arm_movement_command == "DEPLOY_ARM":
+                    self.arm_movement_command = "ADJUST_ARM"
                     self.arm_movement_result_publisher.publish("ARM_DEPLOYED")
                     rospy.loginfo("Arm movement: arm deployed")
                     self.arm_result_sent = True
+                    self.current_joint = "SHOULDER"
                 else:
                     rospy.logwarn("Arm movement: illegal arm state, group 1")
 
@@ -325,8 +349,15 @@ class ArmMovement:
                     self.arm_movement_result_publisher.publish("ARM_AT_BASKET")
                     rospy.loginfo("Arm movement: arm at basket")
                     self.arm_result_sent = True
-                else:
-                    rospy.logwarn("Arm movement: illegal arm state, group 2")
+                elif self.arm_movement_command == "BRINGING_TO_BALL":
+                    self.close_fingers()
+                else: # bring arm to ball
+                    if self.target_shoulder == 1.3 and self.target_elbow2 == 1.3:
+                        self.move_arm("GROUP_1", 0.0, 0.0, 1.53, 0, 0.8, 0.0) # place fingers at the ball's sides
+                        rospy.loginfo("Arm movement: final positioning before grabbing")
+                        self.arm_movement_command == "BRINGING_TO_BALL"
+                    else:
+                        self.camera_state_publisher.publish("SEARCH")
 
 
 if __name__ == "__main__":
