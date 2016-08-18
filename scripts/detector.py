@@ -21,8 +21,6 @@ class Detector:
     wheel_publisher = None
     state = ""
     ball_at_middle_X_of_Asus_Camera = False
-    ball_at_proper_Y_of_Front_Camera = False
-    ball_at_proper_X_of_Front_Camera = False
     ball_positioned = False
     front_camera_x_reference = 0
     front_camera_y_reference = 0
@@ -57,11 +55,6 @@ class Detector:
         elif self.current_camera == "ARM_CAMERA":
             self.camera_subscription = rospy.Subscriber("/Creative_Camera/rgb/image_raw" if self.is_simulation else "/komodo_1/arm_cam_node/image_raw", Image, self.process_image)
             self.move_robot_or_arm = "MOVE_ROBOT"
-        # elif self.current_camera == "FRONT_CAMERA":
-        #     self.ball_at_proper_Y_of_Front_Camera = False
-        #     self.ball_at_proper_X_of_Front_Camera = False
-        #     self.offset = 5
-        #     self.camera_subscription = rospy.Subscriber(adjust_namespace(self.is_simulation, "/Front_Camera/image_raw" if self.is_simulation else "/front_cam_node/image_raw"), Image, self.process_image)
 
     def state_change(self, command):
         if command.data == "SEARCH":
@@ -85,7 +78,7 @@ class Detector:
             output = cv2.bitwise_and(blurred_image, blurred_image, mask = mask)
         else: # ARM_CAMERA
             blurred_image2 = cv2.GaussianBlur(image_cv, (9, 9), 0)
-            (lower, upper) = ([0, 0, 100], [60, 100, 255])
+            (lower, upper) = ([0, 0, 100], [70, 100, 255])
             lower = np.array(lower, dtype = "uint8")
             upper = np.array(upper, dtype = "uint8")
             mask = cv2.inRange(blurred_image, lower, upper)
@@ -105,7 +98,7 @@ class Detector:
         params.filterByColor = False
         params.filterByCircularity = True
         params.filterByArea = True
-        params.minArea = 50
+        params.minArea = 30 if self.current_camera == "ASUS_CAMERA" else 15
         params.maxArea = 2500 if self.current_camera == "ASUS_CAMERA" else 38400
         params.minConvexity = 0.2
         params.maxConvexity = 1.0
@@ -147,8 +140,6 @@ class Detector:
             self.processed_image_bw_publisher.publish(self.bridge.cv2_to_imgmsg(processed_image_bw, "bgr8"))
             if target[2]:
                 rospy.loginfo("x: %d, y: %d, radius: %d", target[0], target[1], target[2])
-                # rospy.loginfo("w:%d h:%d", image.width, image.height)
-
             if self.current_camera == "ASUS_CAMERA" and self.asus_ballpark(target[0], image) and not self.ball_at_middle_X_of_Asus_Camera:
                 self.ball_at_middle_X_of_Asus_Camera = True
                 self.robot_movement_publisher.publish("STOP-BALL_FOUND")
@@ -156,28 +147,27 @@ class Detector:
             elif target != None and self.current_camera == "ASUS_CAMERA" and abs(target[1] - (image.height)) < (image.height / 10.0) and self.ball_at_middle_X_of_Asus_Camera and not self.ball_at_bottom_message_sent:
                 self.ball_at_bottom_message_sent = True
                 self.robot_movement_publisher.publish("STOP-BALL_AT_BOTTOM_OF_FRAME")
-                # self.state_machine_publisher.publish("BALL_AT_BOTTOM_OF_FRAME")
                 rospy.loginfo("Detector: ball is at bottom of Asus Camera frame")
             elif target != None and self.current_camera == "ARM_CAMERA" and self.move_robot_or_arm == "MOVE_ROBOT":
                 if self.is_simulation: # the real arm cam emits an upside-down image, so adjust for orientation
-                    if target[1] < (image.height / 10.0):
-                        if target[0] < image.width * 0.4:
+                    if target[1] < 10:
+                        if target[0] < image.width * 0.45:
                             self.robot_movement_publisher.publish("FORWARD-LEFT")
-                        elif target[0] > image.width * 0.6:
+                        elif target[0] > image.width * 0.55:
                             self.robot_movement_publisher.publish("FORWARD-RIGHT")
                         else:
-                            self.robot_movement_publisher.publish("FORWARD")
+                            self.robot_movement_publisher.publish("FORWARD_ARM")
                     else:
                         self.move_robot_or_arm = "MOVE_ARM"
                         self.robot_movement_publisher.publish("STOP-READY_TO_GRAB")
                 else:
-                    if target[1] > (image.height / 10.0):
-                        if target[0] < image.width * 0.4:
+                    if target[1] > 10:
+                        if target[0] < image.width * 0.45:
                             self.robot_movement_publisher.publish("FORWARD-RIGHT")
-                        elif target[0] > image.width * 0.6:
+                        elif target[0] > image.width * 0.55:
                             self.robot_movement_publisher.publish("FORWARD-LEFT")
                         else:
-                            self.robot_movement_publisher.publish("FORWARD")
+                            self.robot_movement_publisher.publish("FORWARD_ARM")
                     else:
                         self.move_robot_or_arm = "MOVE_ARM"
                         self.robot_movement_publisher.publish("STOP-READY_TO_GRAB")
@@ -191,29 +181,6 @@ class Detector:
                 self.ball_position.img_height = image.height
                 self.ball_position_publisher.publish(self.ball_position)
                 self.state = "NO_SEARCH"
-            # elif self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) > self.offset and not self.ball_at_proper_X_of_Front_Camera and self.previous_state != 2:
-            #     if target[0] - self.front_camera_x_reference > 0:
-            #         self.wheel_publisher.publish("RIGHT")
-            #     else:
-            #         self.wheel_publisher.publish("LEFT")
-            # elif self.current_camera == "FRONT_CAMERA" and abs(target[0] - self.front_camera_x_reference) < self.offset and not self.ball_at_proper_X_of_Front_Camera and self.previous_state != 2:
-            #     self.previous_state = 2
-            #     self.ball_at_proper_X_of_Front_Camera = True
-            #     self.wheel_publisher.publish("STOP-BALL_FOUND")
-            #     # self.ball_positioned = True
-            #     # self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
-            # elif self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) > self.offset and not self.ball_at_proper_Y_of_Front_Camera and target[2] <= 8 and self.previous_state != 3:
-            #     if target[1] - self.front_camera_y_reference > 0:
-            #         self.wheel_publisher.publish("BACKWARD")
-            #     else:
-            #         self.wheel_publisher.publish("FORWARD")
-            # elif self.current_camera == "FRONT_CAMERA" and abs(target[1] - self.front_camera_y_reference) < self.offset and not self.ball_at_proper_Y_of_Front_Camera and not self.ball_positioned and self.previous_state != 3:
-            #     self.previous_state = 3
-            #     self.ball_at_proper_Y_of_Front_Camera = True
-            #     # self.wheel_publisher.publish("STOP-BALL_FOUND")
-            #     self.ball_positioned = True
-            #     self.wheel_publisher.publish("STOP-BALL_AT_POSITION")
-            #     rospy.loginfo("TARGET: %r", target)
 
     def asus_ballpark(self, x, image):
         return (image.width * 0.65) <= x and x <= (image.width * 0.85)

@@ -25,6 +25,7 @@ class RobotMovement:
 	prepared_to_stop = False
 	angular_offset = 0.75
 	odometry_lock = None
+	ball_at_bottom_of_frame = False
 
 	def __init__(self):
 		init_arguments(self)
@@ -70,6 +71,10 @@ class RobotMovement:
 				self.move_robot("FORWARD", self.get_linear_speed(), 0, 0, 0, 0, 0)
 			elif self.movement_command == "BACKWARD":
 				self.move_robot("BACKWARD", -self.get_linear_speed(), 0, 0, 0, 0, 0)
+			elif self.movement_command == "FORWARD-LEFT":
+				self.move_robot("FORWARD-LEFT", self.get_linear_speed(), 0, 0, 0, 0, self.get_anguler_speed() * 3.0)
+			elif self.movement_command == "FORWARD-RIGHT":
+				self.move_robot("FORWARD-RIGHT", self.get_linear_speed(), 0, 0, 0, 0, -self.get_anguler_speed() * 3.0)
 			self.movement_publisher.publish(self.movement_message)
 
 	def stop_in_place(self, cause):
@@ -106,20 +111,25 @@ class RobotMovement:
 			self.searching_for_ball = True
 			self.prepared_to_stop = False
 			self.fine_movement = False
+			self.ball_at_bottom_of_frame = False
 			self.move_robot("RIGHT", 0, 0, 0, 0, 0, -self.get_anguler_speed())
 		elif command.data == "STOP-BALL_FOUND":
 			self.stop_in_place("BALL_FOUND")
 		elif command.data == "STOP-BALL_AT_BOTTOM_OF_FRAME":
 			self.stop_in_place("BALL_AT_BOTTOM_OF_FRAME")
+			ball_at_bottom_of_frame = True
 			self.fine_movement = True
 		elif command.data == "STOP-READY_TO_GRAB":
+			time.sleep(0.7) # advance another inch before stopping for a better grip on the ball
 			self.stop_in_place("READY_TO_GRAB")
-			self.searching_for_ball = False
+			self.searching_for_ball = False 
 		elif command.data == "LEFT":
 			self.move_robot(command.data, 0, 0, 0, 0, 0, self.get_anguler_speed())
 		elif command.data == "RIGHT":
 			self.move_robot(command.data, 0, 0, 0, 0, 0, -self.get_anguler_speed())
-		elif command.data == "FORWARD":
+		elif command.data == "FORWARD_ASUS" and not self.ball_at_bottom_of_frame:
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
+		elif command.data == "FORWARD_ARM":
 			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
 		elif command.data == "FORWARD-LEFT":
 			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, self.get_anguler_speed() * 3.0)

@@ -3,6 +3,7 @@
 
 	<include file="$(find ric_board)/launch/komodo_bgu.launch"/>
 
+	<node name="finger_movement"  pkg="jupiter" type="finger_movement.py"     args="" respawn="true" />
 	<node name="arm_movement" pkg="jupiter" type="arm_movement.py"  output="screen" args="" respawn="true" /> 
 	<node name="robot_movement" pkg="jupiter" type="robot_movement.py" output="screen" args="" respawn="true" />
 	<node name="detector" pkg="jupiter" type="detector.py" output="screen" args="" respawn="true" />

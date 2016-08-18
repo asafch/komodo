@@ -40,7 +40,7 @@
     <arg name="Y" value="0.0" />
   </include>
   
-
+  <node name="finger_movement"  pkg="jupiter" type="finger_movement.py"     args="-is_simulation" respawn="true" />
   <node name="arm_movement" pkg="jupiter" type="arm_movement.py"  output="screen" args="--is_simulation" respawn="true" /> 
   <node name="robot_movement" pkg="jupiter" type="robot_movement.py" output="screen" args="--is_simulation" respawn="true" />
   <node name="detector" pkg="jupiter" type="detector.py" output="screen" args="--is_simulation" respawn="true" />
