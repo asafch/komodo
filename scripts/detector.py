@@ -76,20 +76,21 @@ class Detector:
             return
         image_cv = self.bridge.imgmsg_to_cv2(image, "bgr8")
         blurred_image = cv2.GaussianBlur(image_cv, (9, 9), 0)
+        # The two cameras have different sensors, so their color rendition varies. Adjust for this issue when trying to filter the red colors in the image.
         if self.current_camera == "ASUS_CAMERA":
             (lower, upper) = ([0, 0, 100], [55, 55, 255]) # dark red
             lower = np.array(lower, dtype = "uint8")
             upper = np.array(upper, dtype = "uint8")
             mask = cv2.inRange(blurred_image, lower, upper)
             output = cv2.bitwise_and(blurred_image, blurred_image, mask = mask)
-        else:
+        else: # ARM_CAMERA
             blurred_image2 = cv2.GaussianBlur(image_cv, (9, 9), 0)
             (lower, upper) = ([0, 0, 100], [60, 100, 255])
             lower = np.array(lower, dtype = "uint8")
             upper = np.array(upper, dtype = "uint8")
             mask = cv2.inRange(blurred_image, lower, upper)
             output_dark_orange = cv2.bitwise_and(blurred_image, blurred_image, mask = mask)
-            (lower2, upper2) = ([70, 110, 200], [100, 170, 255])
+            (lower2, upper2) = ([65, 50, 170], [100, 70, 255])
             lower2 = np.array(lower2, dtype = "uint8")
             upper2 = np.array(upper2, dtype = "uint8")
             mask2 = cv2.inRange(blurred_image2, lower2, upper2)

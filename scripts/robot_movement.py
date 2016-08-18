@@ -122,9 +122,9 @@ class RobotMovement:
 		elif command.data == "FORWARD":
 			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, 0)
 		elif command.data == "FORWARD-LEFT":
-			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, self.get_anguler_speed())
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, self.get_anguler_speed() * 3.0)
 		elif command.data == "FORWARD-RIGHT":
-			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, -self.get_anguler_speed())
+			self.move_robot(command.data, self.get_linear_speed(), 0, 0, 0, 0, -self.get_anguler_speed() * 3.0)
 		else: # BACKWARD
 			self.move_robot(command.data, -self.get_linear_speed(), 0, 0, 0, 0, 0)
 		rospy.loginfo("Robot movement: move %s", self.movement_command)

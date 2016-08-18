@@ -105,20 +105,24 @@ class ArmMovement:
     def process_ball_position(self, message):
         rospy.loginfo("Arm movement: ball pos msg\n%r", message)
         if message.detected:
-            self.arm_movement_command = "BRINGING_TO_BALL"
+            self.initialize_arm_subscribers()
             x_offset = message.x - message.img_width / 2
             y_offset = message.y - message.img_height / 2
             if abs(x_offset) > self.pixels_error: # arm isn't centered with respect to the ball
                 self.move_arm("GROUP_1", 0.0, self.target_base + np.sign(x_offset) * 0.01, self.target_shoulder, self.target_elbow1, self.target_elbow2, self.target_wrist)
+                rospy.loginfo("moved base")
             elif self.current_joint == "SHOULDER":
                 self.current_joint = "ELBOW2"
-                self.move_arm("GROUP_1", 0.0, self.target_base, min(1.3, self.target_shoulder + 0.05), self.target_elbow1, self.target_elbow2, self.target_wrist)
+                self.move_arm("GROUP_1", 0.0, self.target_base, min(1.3, self.target_shoulder + 0.03), self.target_elbow1, self.target_elbow2, self.target_wrist)
                 rospy.loginfo("moved shoulder")
             else: # "ELBOW2"
                 self.current_joint = "SHOULDER"
-                self.target_elbow2 = max(1.3, self.target_elbow2 - 0.1)
-                self.move_arm("GROUP_1", 0.0, self.target_base, self.target_shoulder, self.target_elbow1,  self.target_elbow2, self.target_wrist)
-                rospy.loginfo("moved elbow2")
+                if message.img_height / 3 <= message.y and message.y <= message.img_height * 0.66: 
+                    self.target_elbow2 = max(1.3, self.target_elbow2 - 0.03)
+                    self.move_arm("GROUP_1", 0.0, self.target_base, self.target_shoulder, self.target_elbow1,  self.target_elbow2, self.target_wrist)
+                    rospy.loginfo("moved elbow2")
+                else:
+                    self.camera_state_publisher.publish("SEARCH")
         else:
             self.camera_state_publisher.publish("SEARCH")
 
@@ -139,9 +143,11 @@ class ArmMovement:
         self.target_elbow2 = elbow2
         self.target_wrist = wrist
         if first_group == "GROUP_1":
+            rospy.loginfo("group 1 moves first")
             self.first_group_moving = 1
             self.move_group1()
         else:
+            rospy.loginfo("group 2 moves first")
             self.first_group_moving = 2
             self.move_group2()
         self.arm_lock.release()
