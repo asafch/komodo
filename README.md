@@ -1,13 +1,10 @@
-# Jupiter - a Komodo project with OpenCV and ROS
+# Jupiter - a robotics and computer vision project
 
-## Pre-requisites
+We use the Komodo robot to find and grab all red balls in a room.
 
-## Technical Notes
+Please refer to the [final report](https://github.com/asafch/komodo/blob/master/Jupiter%20Final%20Report.pdf) for further information.
 
-chmod +x all scripts
-
-## Further reference
-Please consult report.pdf.
+You can see a short (~2 mins) intro video in Hebrew [here](https://www.youtube.com/watch?v=UtKnoQu_9Ho) and a demonstration video (~4.5 mins) of the robot [here](https://www.youtube.com/watch?v=GswU1YVCJvo).
 
 ## License
 
